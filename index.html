@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Galera">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Galera — la prueba de las letras. Forma la palabra más larga con nueve letras.">
+<title>Galera · Letras</title>
+
+<script>
+  (function () {
+    try { if (localStorage.getItem('galera_theme') === 'light') document.documentElement.classList.add('pre-light'); } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,700;1,500;1,700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0b0c; --panel: #141416; --panel-2: #1b1b1f; --line: #2c2c30;
+  --text: #f4f4f2; --muted: #76767c; --accent: #f4f4f2; --amber: #d4a017;
+  --grain-opacity: 0.45; --vignette: rgba(0,0,0,0.5); --on-accent: #0b0b0c; --bad: #e06363;
+  --cube-top:#34343a; --cube-bot:#191a1e; --cube-edge:#070708; --cube-text:#f2efe8; --hole:#0e0e10; --hole-line:#33323a;
+}
+body.light, html.pre-light body {
+  --bg: #f3f2ee; --panel: #e7e6df; --panel-2: #eeede7; --line: #d2d0c6;
+  --text: #17171a; --muted: #8c8b81; --accent: #17171a; --amber: #b8860b;
+  --grain-opacity: 0.16; --vignette: rgba(60,58,50,0.10); --on-accent: #f3f2ee;
+  --cube-top:#ffffff; --cube-bot:#dad7cd; --cube-edge:#b3afa3; --cube-text:#1b1a17; --hole:#e2dfd6; --hole-line:#c4c0b4;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg); color: var(--text); font-family: 'Cormorant Garamond', serif;
+  background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 62%), radial-gradient(ellipse 60% 80% at 50% 100%, rgba(255,255,255,0.03) 0%, transparent 62%);
+  background-attachment: fixed; position: relative; overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none; transition: background-color 0.4s ease, color 0.4s ease;
+}
+body.light { background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,0,0,0.04) 0%, transparent 62%), radial-gradient(ellipse 60% 80% at 50% 100%, rgba(0,0,0,0.03) 0%, transparent 62%); }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); opacity: var(--grain-opacity); mix-blend-mode: overlay; }
+body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at center, transparent 52%, var(--vignette) 100%); }
+.mono { font-family: 'IBM Plex Mono', monospace; font-feature-settings: "tnum"; }
+
+#theme-toggle { position: fixed; top: max(1rem, env(safe-area-inset-top)); right: 1.2rem; z-index: 500; width: 56px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; outline: none; padding: 0; display: flex; align-items: center; transition: background .3s, border-color .3s; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+#theme-toggle .knob { position: absolute; width: 24px; height: 24px; border-radius: 50%; left: 2px; background: radial-gradient(circle at 35% 30%, #ffffff, #cfcfcf 70%, #9a9a9a); box-shadow: 0 1px 4px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.5); transition: transform .3s cubic-bezier(.2,.9,.3,1); display: flex; align-items: center; justify-content: center; font-size: .7rem; line-height: 1; }
+#theme-toggle .knob::after { content: '☾'; color: #1a1a1a; }
+body.light #theme-toggle .knob { transform: translateX(26px); background: radial-gradient(circle at 35% 30%, #3a3a3a, #1a1a1a 70%, #000); }
+body.light #theme-toggle .knob::after { content: '☀'; color: #f3f2ee; }
+body.light #theme-toggle { border-color: var(--accent); }
+#sound-toggle { position: fixed; top: max(1rem, env(safe-area-inset-top)); right: 5.2rem; z-index: 500; width: 38px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; outline: none; padding: 0; display: flex; align-items: center; justify-content: center; font-size: .95rem; color: var(--text); transition: background .3s, border-color .3s, color .3s; }
+#sound-toggle.muted { color: var(--muted); }
+#sound-toggle .ic-on { display: inline; } #sound-toggle .ic-off { display: none; }
+#sound-toggle.muted .ic-on { display: none; } #sound-toggle.muted .ic-off { display: inline; }
+#help-btn { position: fixed; top: max(1rem, env(safe-area-inset-top)); left: 1.2rem; z-index: 500; width: 30px; height: 30px; border-radius: 50%; border: none; outline: none; cursor: pointer; background: var(--accent); color: var(--on-accent); font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 700; font-size: 1.1rem; line-height: 1; display: flex; align-items: center; justify-content: center; transition: transform .1s, background .3s, color .3s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+#help-btn:active { transform: scale(0.9); }
+body.in-game #theme-toggle, body.in-game #sound-toggle, body.in-game #help-btn { opacity: .25; transition: opacity .3s; }
+body.in-game #theme-toggle:active, body.in-game #sound-toggle:active, body.in-game #help-btn:active { opacity: .9; }
+
+#app-splash { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; align-items: center; justify-content: center; transition: opacity .6s ease; }
+html.pre-light #app-splash { background: #f3f2ee; }
+#app-splash.hiding { opacity: 0; pointer-events: none; }
+.splash-seal { width: 150px; height: 150px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; animation: sealMint 1.1s cubic-bezier(.2,.9,.3,1) both; overflow: hidden; }
+.splash-seal img { width: 100%; height: 100%; object-fit: contain; display: block; animation: glyphDrop .7s cubic-bezier(.3,1.4,.5,1) both; animation-delay: .3s; }
+body.light .splash-seal { box-shadow: none; }
+@keyframes sealMint { 0%{opacity:0; transform: scale(.3) rotateY(180deg);} 60%{opacity:1; transform: scale(1.08);} 100%{opacity:1; transform: scale(1);} }
+@keyframes glyphDrop { 0%{opacity:0; transform: translateY(-34px) scale(1.4);} 70%{opacity:1; transform: translateY(3px) scale(.96);} 100%{opacity:1; transform: translateY(0) scale(1);} }
+@keyframes ringSpin { to { transform: rotate(360deg); } }
+
+.screen { display: none; position: fixed; inset: 0; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; text-align: center; z-index: 5; overflow-y: auto; }
+.screen.visible { display: flex; animation: screenIn .45s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes screenIn { 0%{opacity:0; transform: translateY(12px);} 100%{opacity:1; transform: translateY(0);} }
+.seal { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.4rem; position: relative; flex-shrink: 0; overflow: hidden; }
+.seal img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.seal.pulsing { animation: sealBreathe 3.4s ease-in-out infinite; }
+@keyframes sealBreathe { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.04); } }
+.title { font-size: clamp(2.4rem, 9vw, 4.2rem); font-weight: 500; font-style: italic; line-height: .92; letter-spacing: -.01em; margin-bottom: .2rem; }
+.title span { display: block; font-style: normal; font-weight: 700; letter-spacing: -.02em; }
+.subtitle { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .5em; color: var(--muted); margin: 1.1rem 0 2rem; text-transform: uppercase; display: flex; align-items: center; gap: .8rem; }
+.subtitle::before, .subtitle::after { content: '·'; font-size: 1.4rem; opacity: .6; }
+.btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 1rem 2rem; font-family: 'IBM Plex Mono', monospace; font-size: .75rem; letter-spacing: .35em; cursor: pointer; outline: none; text-transform: uppercase; transition: all .2s; min-width: 230px; }
+.btn:hover, .btn:active { background: var(--accent); color: var(--on-accent); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn:disabled:hover, .btn:disabled:active { background: transparent; color: var(--accent); }
+.btn-secondary { border-color: var(--line); color: var(--muted); font-size: .65rem; padding: .7rem 1.5rem; letter-spacing: .3em; min-width: 0; }
+.btn-secondary:hover, .btn-secondary:active { border-color: var(--text); color: var(--text); background: transparent; }
+.btn-soon { position: relative; }
+.btn-soon::after { content: 'pronto'; position: absolute; top: -.55rem; right: -.4rem; font-size: .42rem; letter-spacing: .2em; background: var(--muted); color: var(--bg); padding: .15rem .35rem; border-radius: 3px; }
+.btn-row { display: flex; flex-direction: column; gap: .8rem; align-items: center; }
+.btn-back-row { margin-top: 1.4rem; }
+.section-label { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; margin-bottom: .7rem; }
+.online-intro { max-width: 300px; color: var(--muted); font-size: .95rem; line-height: 1.5; margin-bottom: 1.8rem; }
+
+.cards { display: flex; gap: .8rem; flex-wrap: wrap; justify-content: center; margin-bottom: 1.6rem; }
+.card { width: 100px; background: linear-gradient(180deg, #2a2a30 0%, #1f1f24 100%); border: 1px solid #3a3a41; border-radius: 8px; cursor: pointer; outline: none; position: relative; display: flex; flex-direction: column; align-items: center; padding: .9rem .5rem; transition: all .2s ease; overflow: hidden; }
+body.light .card { background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%); border-color: var(--line); }
+.card::before { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: .4; }
+.card:active, .card.selected { border-color: var(--accent); background: linear-gradient(180deg, #33333a 0%, #28282e 100%); box-shadow: 0 0 0 1px var(--accent) inset, 0 0 26px rgba(255,255,255,.07); }
+body.light .card.selected { background: linear-gradient(180deg, #fbfbf8 0%, #f3f2ec 100%); box-shadow: 0 0 0 1px var(--accent) inset, 0 0 26px rgba(0,0,0,.05); }
+.card .c-roman { font-style: italic; font-size: 1.8rem; font-weight: 500; line-height: 1; color: var(--text); }
+.card .c-name { font-family: 'IBM Plex Mono', monospace; font-size: .55rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--text); margin-top: .35rem; }
+
+/* online: nombre / código */
+.name-input, .code-input { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-family: 'IBM Plex Mono', monospace; text-align: center; outline: none; transition: border-color .2s; }
+.name-input { font-size: 1.1rem; letter-spacing: .05em; padding: .8rem 1rem; width: 260px; margin-bottom: 1.2rem; }
+.code-input { font-size: 2rem; letter-spacing: .4em; text-transform: uppercase; padding: .8rem .5rem .8rem .9em; width: 230px; margin-bottom: 1rem; }
+.name-input:focus, .code-input:focus { border-color: var(--accent); }
+.name-input::placeholder, .code-input::placeholder { color: var(--muted); opacity: .45; }
+.room-code-label { font-family: 'IBM Plex Mono', monospace; font-size: .55rem; letter-spacing: .35em; color: var(--muted); text-transform: uppercase; margin-bottom: .7rem; }
+.room-code { font-family: 'IBM Plex Mono', monospace; font-size: 2.8rem; letter-spacing: .5em; font-weight: 600; color: var(--accent); padding: .55rem 0 .55rem .5em; border: 1px solid var(--accent); border-radius: 8px; min-width: 220px; box-shadow: inset 0 0 22px rgba(255,255,255,.06); margin-bottom: 1.3rem; }
+body.light .room-code { box-shadow: inset 0 0 22px rgba(0,0,0,.05); }
+.join-error { color: var(--bad); font-size: .8rem; min-height: 1.1em; margin: .3rem 0; letter-spacing: .02em; }
+
+/* lobby */
+.lobby-players { display: flex; flex-direction: column; gap: .5rem; width: 100%; max-width: 340px; margin: 0 auto 1.4rem; }
+.lobby-player { display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.lobby-player.me { border-color: var(--accent); }
+.lobby-player.disconnected { opacity: .4; }
+.lobby-player .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: var(--p-color, var(--muted)); }
+.lobby-player .nm { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; flex: 1; text-align: left; }
+.lobby-player .tag { font-family: 'IBM Plex Mono', monospace; font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.guest-waiting { color: var(--muted); font-size: .95rem; letter-spacing: .04em; }
+.dots::after { content: ''; animation: dots 1.4s steps(4) infinite; }
+@keyframes dots { 0%{content:'';} 25%{content:'.';} 50%{content:'..';} 75%{content:'...';} }
+
+#screen-game { padding: 0; display: none; flex-direction: column; justify-content: flex-start; text-align: center; }
+#screen-game.visible { display: flex; }
+.online-banner { width: 100%; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: .55rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); padding: .3rem 0 0; min-height: 1rem; }
+.game-head { flex: 0 0 auto; width: 100%; padding: max(.5rem, env(safe-area-inset-top)) 1rem .3rem; }
+.status-bar { display: flex; align-items: stretch; justify-content: center; gap: .5rem; max-width: 460px; margin: 0 auto; }
+.stat-chip { flex: 1 1 0; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .42rem .4rem; display: flex; flex-direction: column; align-items: center; gap: .12rem; }
+.stat-chip .cv { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 1.05rem; line-height: 1; }
+.stat-chip.clock .cv.warn { color: var(--bad); }
+.stat-chip .cl { font-family: 'IBM Plex Mono', monospace; font-size: .46rem; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+.live-scores { display: none; gap: .35rem; max-width: 460px; margin: .45rem auto 0; overflow-x: auto; padding-bottom: 3px; scrollbar-width: none; }
+.live-scores::-webkit-scrollbar { display: none; }
+.live-scores.center { justify-content: center; }
+.ls-chip { flex: 0 0 auto; display: flex; align-items: center; gap: .32rem; padding: .26rem .55rem; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); transition: border-color .2s; }
+.ls-chip.me { border-color: var(--accent); }
+.ls-chip.lead { border-color: var(--amber); }
+.ls-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--p-color, var(--muted)); flex-shrink: 0; }
+.ls-nm { font-family: 'IBM Plex Mono', monospace; font-size: .54rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-pts { font-family: 'IBM Plex Mono', monospace; font-size: .82rem; font-weight: 700; color: var(--text); }
+.ls-chip.lead .ls-pts { color: var(--amber); }
+.target-wrap { margin: .7rem auto .25rem; position: relative; }
+#mode-toggle { position: absolute; right: .1rem; top: 50%; transform: translateY(-50%); width: 56px; height: 30px; border-radius: 15px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; outline: none; padding: 0; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+#mode-toggle .knob { position: absolute; width: 24px; height: 24px; border-radius: 50%; top: 2px; left: 2px; background: radial-gradient(circle at 35% 30%, #ffffff, #cfcfcf 70%, #9a9a9a); box-shadow: 0 1px 4px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.5); transition: transform .3s cubic-bezier(.2,.9,.3,1); transform: translateX(26px); }
+#mode-toggle.tap .knob { transform: translateX(0); }
+.mode-lab { position: absolute; right: 0; top: calc(50% + 20px); width: 58px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: .46rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.target-label { font-family: 'IBM Plex Mono', monospace; font-size: .55rem; letter-spacing: .4em; color: var(--muted); text-transform: uppercase; }
+.target-num { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: clamp(2.4rem, 12vw, 3.6rem); line-height: 1; letter-spacing: .04em; }
+.board-wrap { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: .2rem .8rem; min-height: 0; gap: .8rem; position: relative; }
+.tiles { display: flex; flex-direction: column; gap: .6rem; align-items: center; }
+.cube-row { display: flex; gap: .6rem; justify-content: center; }
+.cube, .slot { width: 64px; height: 64px; border-radius: 13px; position: relative; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 1.4rem; user-select: none; -webkit-user-select: none; touch-action: none; }
+.cube { background: linear-gradient(158deg, var(--cube-top), var(--cube-bot)); color: var(--cube-text);
+  box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4);
+  cursor: grab; transition: transform .12s cubic-bezier(.2,.8,.3,1), box-shadow .12s; animation: settle .26s cubic-bezier(.25,1.4,.5,1) both; }
+.cube.op { font-size: 1.55rem; }
+.cube.res { box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 0 1.5px var(--amber) inset; }
+.cube.diana { color: var(--amber); box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 24px rgba(212,160,23,.55); }
+.slot { background: var(--hole); box-shadow: inset 0 5px 9px rgba(0,0,0,.5), inset 0 -1px 0 rgba(255,255,255,.04); border: 1.5px dashed var(--hole-line); color: var(--muted); font-size: 1.1rem; transition: box-shadow .15s, border-color .15s; }
+.slot.dropok { border-color: var(--amber); border-style: solid; box-shadow: inset 0 0 0 2px rgba(212,160,23,.5), inset 0 5px 9px rgba(0,0,0,.4); }
+.slot.filled { border: none; background: transparent; box-shadow: none; }
+
+.ops { display: flex; gap: .5rem; justify-content: center; align-items: center; }
+.op-clear { width: 54px; height: 50px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 1.15rem; font-weight: 700; letter-spacing: .05em; cursor: pointer; outline: none; display: flex; align-items: center; justify-content: center; }
+.op-clear:active { transform: scale(.94); }
+
+.build { display: flex; align-items: center; justify-content: center; gap: .45rem; min-height: 64px; }
+.build .bslot { width: 54px; height: 54px; font-size: 1.2rem; }
+.build .bslot.op { width: 48px; height: 48px; }
+.build .bslot.filled .cube { width: 54px; height: 54px; animation: none; }
+.build .bslot.op.filled .cube { width: 48px; height: 48px; }
+.build .eq { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; color: var(--muted); margin: 0 .05rem; }
+.build .bslot.bad { color: var(--bad); border-color: var(--bad); border-style: solid; font-size: 1.3rem; }
+
+#ghost { position: fixed; left: 0; top: 0; z-index: 9999; pointer-events: none; display: none; margin: 0 !important; will-change: transform; transition: none !important; animation: none !important;
+  box-shadow: inset 0 2px 1px rgba(255,255,255,.16), inset 0 -4px 6px rgba(0,0,0,.32), 0 11px 0 var(--cube-edge), 0 20px 28px rgba(0,0,0,.55) !important; }
+@keyframes settle { 0%{transform:scale(.7);opacity:0;} 60%{transform:scale(1.07);} 100%{transform:scale(1);opacity:1;} }
+.best-line { font-family: 'IBM Plex Mono', monospace; font-size: .7rem; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; min-height: 1.1em; }
+.best-line b { color: var(--text); font-weight: 700; font-size: .95rem; }
+.best-line .diana { color: var(--amber); }
+.game-foot { flex: 0 0 auto; width: 100%; padding: .5rem 1rem max(.9rem, env(safe-area-inset-bottom)); display: flex; gap: .7rem; justify-content: center; }
+.game-foot .btn-secondary { min-width: 110px; text-align: center; }
+/* velo de espera (online, tras plantarse) */
+.wait-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 80%, transparent); display: none; flex-direction: column; align-items: center; justify-content: center; gap: .4rem; z-index: 4; }
+.wait-veil.on { display: flex; }
+.wait-veil .wv-fig { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 2.2rem; }
+.wait-veil .wv-txt { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); }
+
+#reveal { position: fixed; inset: 0; z-index: 620; background: color-mix(in srgb, var(--bg) 93%, transparent); display: none; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.2rem; }
+#reveal.visible { display: flex; animation: screenIn .45s ease both; }
+#reveal .r-round { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .5em; color: var(--muted); text-transform: uppercase; margin-bottom: 1rem; }
+#reveal .r-star { font-size: 3.2rem; color: var(--amber); line-height: 1; text-shadow: 0 0 30px rgba(212,160,23,.6); animation: starSpin 1.4s ease-out both; margin-bottom: .3rem; }
+#reveal:not(.diana) .r-star { display: none; }
+@keyframes starSpin { 0%{opacity:0; transform: rotate(-180deg) scale(.3);} 60%{opacity:1; transform: rotate(0) scale(1.2);} 100%{opacity:1; transform: rotate(0) scale(1);} }
+#reveal .r-figure { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: clamp(2.6rem,12vw,4rem); line-height: 1; }
+#reveal.diana .r-figure { color: var(--amber); }
+#reveal .r-dist { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.4rem; color: var(--text); margin-top: .5rem; }
+#reveal .r-best { font-family: 'IBM Plex Mono', monospace; font-size: .56rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; margin-top: .9rem; }
+/* ranking online */
+#r-rank { display: none; flex-direction: column; gap: .35rem; width: 100%; max-width: 360px; margin-top: 1rem; }
+#reveal.multi #r-rank { display: flex; }
+#reveal.multi .r-figure, #reveal.multi .r-dist, #reveal.multi .r-best, #reveal.multi .r-star { display: none; }
+.rk-row { display: flex; align-items: center; gap: .6rem; padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.rk-row.me { border-color: var(--accent); }
+.rk-row.win { border-color: var(--amber); }
+.rk-pos { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: .8rem; width: 1.4em; color: var(--muted); }
+.rk-row.win .rk-pos { color: var(--amber); }
+.rk-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--p-color, var(--muted)); flex-shrink: 0; }
+.rk-nm { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; flex: 1; text-align: left; }
+.rk-fig { font-family: 'IBM Plex Mono', monospace; font-size: .9rem; }
+.rk-pts { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: .9rem; min-width: 2.4em; text-align: right; }
+
+#final { position: fixed; inset: 0; z-index: 700; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.4rem; background: radial-gradient(ellipse at center, rgba(40,28,5,0.96), var(--bg) 80%); overflow-y: auto; }
+body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,120,0.35), var(--bg) 80%); }
+#final.visible { display: flex; animation: screenIn .5s ease both; }
+#final .f-star { font-size: 4rem; color: var(--amber); text-shadow: 0 0 30px rgba(212,160,23,.7); animation: starSpin 1.8s ease-out both; }
+#final .f-label { font-family: 'IBM Plex Mono', monospace; font-size: .65rem; letter-spacing: .55em; color: var(--amber); text-transform: uppercase; margin: 1rem 0 .3rem; }
+#final .f-figure { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: clamp(2.4rem,10vw,3.8rem); font-weight: 500; line-height: 1; background: linear-gradient(180deg, #f4d987 0%, #c8941f 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+#final .f-sub { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .25em; color: var(--muted); text-transform: uppercase; margin-top: .9rem; }
+#final .f-sub b { color: var(--text); font-weight: 700; }
+#final .f-stats { display: flex; gap: 1.4rem; margin: 1.6rem 0 .2rem; }
+#final.multi .f-stats { display: none; }
+#final .f-stat { display: flex; flex-direction: column; gap: .2rem; }
+#final .f-stat .v { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 1.8rem; }
+#final .f-stat .l { font-family: 'IBM Plex Mono', monospace; font-size: .5rem; letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+#f-standings { display: none; flex-direction: column; gap: .35rem; width: 100%; max-width: 340px; margin: 1.4rem 0 .4rem; }
+#final.multi #f-standings { display: flex; }
+.f-btns { margin-top: 1.6rem; display: flex; flex-direction: column; gap: .7rem; align-items: center; }
+
+#tutorial-overlay { position: fixed; inset: 0; z-index: 600; background: color-mix(in srgb, var(--bg) 97%, transparent); display: none; flex-direction: column; padding: 2rem 1.4rem 1.4rem; overflow-y: auto; }
+#tutorial-overlay.visible { display: flex; animation: screenIn .4s ease both; }
+#tutorial-overlay h2 { font-style: italic; font-size: clamp(2rem,7vw,2.8rem); font-weight: 500; text-align: center; margin-bottom: .2rem; }
+#tutorial-overlay .tut-sub { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .4em; color: var(--muted); text-align: center; text-transform: uppercase; margin-bottom: 1.8rem; }
+.tut-step { display: flex; gap: .9rem; align-items: flex-start; margin: 0 auto 1.2rem; max-width: 480px; width: 100%; }
+.tut-num { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.tut-text { font-size: 1.15rem; line-height: 1.45; text-align: left; }
+.tut-text b { font-weight: 700; border-bottom: 1px solid var(--muted); }
+.tut-close { align-self: center; margin: .8rem 0 1rem; }
+
+#toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 900; background: var(--panel); border: 1px solid var(--line); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: .7rem; letter-spacing: .05em; padding: .7rem 1.2rem; border-radius: 8px; opacity: 0; pointer-events: none; transition: all .3s; max-width: 80vw; text-align: center; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+<style>
+/* ===== Galera: añadidos sobre el shell ===== */
+/* La ficha de letra hereda .cube; solo ajustamos tamaño de fuente y mayúsculas */
+.cube.letter { font-size: 1.7rem; text-transform: uppercase; }
+.slot.letter { font-size: 1.5rem; text-transform: uppercase; }
+
+/* bandeja de 9 letras */
+.rack { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; max-width: 360px; }
+.rack .cube.used { opacity: .22; pointer-events: none; box-shadow: inset 0 2px 1px rgba(255,255,255,.08), inset 0 -3px 5px rgba(0,0,0,.25), 0 3px 0 var(--cube-edge); transform: scale(.94); }
+
+/* tira de construcción de la palabra (hasta 9 huecos) */
+.word { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; min-height: 56px; align-items: center; }
+.word .slot { width: 50px; height: 56px; }
+.word .cube { width: 50px; height: 56px; }
+.word.valid .cube { box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 0 1.5px var(--amber) inset; }
+
+/* línea de estado de la palabra (válida / no existe / longitud) */
+.word-state { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; min-height: 1.1em; color: var(--muted); margin-top: .3rem; }
+.word-state.ok { color: var(--amber); }
+.word-state.bad { color: var(--bad); }
+
+/* reveal: la palabra del jugador en grande */
+#reveal .r-word { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: clamp(2rem,9vw,3rem); text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
+#reveal.diana .r-word { color: var(--amber); }
+
+/* botón instalar PWA */
+#install-btn { display: none; margin-top: 1rem; }
+#install-btn.show { display: inline-block; }
+
+/* récord en pantalla final */
+.f-record { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--amber); margin-top: .8rem; min-height: 1em; }
+.f-record b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"></svg>
+
+<button id="theme-toggle" aria-label="Cambiar tema"><span class="knob"></span></button>
+<button id="sound-toggle" aria-label="Sonido"><span class="ic-on">♪</span><span class="ic-off">✕</span></button>
+<button id="help-btn" aria-label="Cómo se juega">?</button>
+
+<div id="tutorial-overlay">
+  <h2>Cómo se juega</h2>
+  <div class="tut-sub">galera · letras</div>
+  <div class="tut-step"><div class="tut-num">1</div><div class="tut-text">Recibes <b>nueve letras</b>. Forma la <b>palabra más larga</b> posible usando solo esas letras.</div></div>
+  <div class="tut-step"><div class="tut-num">2</div><div class="tut-text">Cada letra se usa <b>las veces que aparezca</b> en la bandeja, no más. Tocas o arrastras las fichas para componer la palabra.</div></div>
+  <div class="tut-step"><div class="tut-num">3</div><div class="tut-text">La palabra debe <b>existir</b> en el diccionario. Tildes y mayúsculas dan igual; la <b>ñ</b> es una letra propia. Puntúas por <b>número de letras</b>.</div></div>
+  <div class="tut-step"><div class="tut-num">★</div><div class="tut-text">Usar las <b>nueve letras</b> es una <b>palabra redonda</b>, con bonus. Tienes 60 segundos por ronda y juegas 10, 15 o 20 rondas.</div></div>
+  <button class="btn-secondary btn tut-close" id="tut-close">cerrar</button>
+</div>
+
+<div id="app-splash"><div class="splash-seal"><img src="galera-seal.png" alt=""></div></div>
+
+<!-- HOME -->
+<div id="screen-home" class="screen visible">
+  <div class="seal"><img src="galera-seal.png" alt=""></div>
+  <div class="title"><span>Galera</span></div>
+  <div class="subtitle">letras</div>
+  <div class="btn-row">
+    <button class="btn" id="btn-solo">Jugar</button>
+    <button class="btn btn-soon" id="btn-online" disabled>Jugar online</button>
+    <button class="btn-secondary btn" id="install-btn">Instalar app</button>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div id="screen-setup" class="screen">
+  <div class="seal"><img src="galera-seal.png" alt=""></div>
+  <div class="subtitle">una partida</div>
+  <div class="section-label">rondas</div>
+  <div class="cards" id="round-cards">
+    <button class="card selected" data-rounds="10"><div class="c-roman">X</div><div class="c-name">10 rondas</div></button>
+    <button class="card" data-rounds="15"><div class="c-roman">XV</div><div class="c-name">15 rondas</div></button>
+    <button class="card" data-rounds="20"><div class="c-roman">XX</div><div class="c-name">20 rondas</div></button>
+  </div>
+  <button class="btn" id="btn-play">Empezar →</button>
+  <div class="btn-back-row"><button class="btn-secondary btn" id="btn-setup-back">← volver</button></div>
+</div>
+
+<!-- JUEGO -->
+<div id="screen-game" class="screen">
+  <div class="game-head">
+    <div class="status-bar">
+      <div class="stat-chip"><div class="cv" id="st-round">1/10</div><div class="cl">ronda</div></div>
+      <div class="stat-chip"><div class="cv" id="st-score">0</div><div class="cl">letras</div></div>
+      <div class="stat-chip clock"><div class="cv" id="st-clock">60</div><div class="cl">segundos</div></div>
+    </div>
+    <div class="target-wrap">
+      <div class="target-label">tu palabra</div>
+      <button id="mode-toggle" aria-label="Modo de interacción"><span class="knob"></span></button>
+      <div class="mode-lab" id="mode-lab">arrastrar</div>
+    </div>
+  </div>
+  <div class="board-wrap">
+    <div class="word" id="word"></div>
+    <div class="word-state" id="word-state">forma una palabra</div>
+    <div class="rack" id="rack"></div>
+    <div class="wait-veil" id="wait-veil"></div>
+  </div>
+  <div class="game-foot">
+    <button class="btn-secondary btn" id="btn-back1">borrar</button>
+    <button class="btn-secondary btn" id="btn-clear">limpiar</button>
+    <button class="btn-secondary btn" id="btn-stand">plantarse</button>
+  </div>
+</div>
+
+<!-- REVEAL -->
+<div id="reveal">
+  <div class="r-round" id="r-round">ronda 1</div>
+  <div class="r-star">★</div>
+  <div class="r-word mono" id="r-word">—</div>
+  <div class="r-dist" id="r-dist"></div>
+  <div class="r-best" id="r-best"></div>
+</div>
+
+<!-- FINAL -->
+<div id="final">
+  <div class="f-star">★</div>
+  <div class="f-label" id="f-label">partida completada</div>
+  <div class="f-figure" id="f-figure">—</div>
+  <div class="f-sub" id="f-sub"></div>
+  <div class="f-stats">
+    <div class="f-stat"><span class="v mono" id="f-total">0</span><span class="l">letras</span></div>
+    <div class="f-stat"><span class="v mono" id="f-best">—</span><span class="l">mejor palabra</span></div>
+    <div class="f-stat"><span class="v mono" id="f-rounds">0</span><span class="l">rondas</span></div>
+  </div>
+  <div class="f-record" id="f-record"></div>
+  <div class="f-btns">
+    <button class="btn" id="btn-again">Otra vez</button>
+    <button class="btn-secondary btn" id="btn-home">← menú</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="ghost" class="cube letter"></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ===================== AUDIO ===================== */
+let muted = false;
+try { muted = localStorage.getItem('galera_sound') === 'off'; } catch (e) {}
+let actx = null;
+function ac() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } return actx; }
+function tone(freq, dur, type, vol) {
+  if (muted) return;
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine'; o.frequency.value = freq;
+  g.gain.value = vol || 0.06;
+  o.connect(g); g.connect(c.destination);
+  const t = c.currentTime;
+  g.gain.setValueAtTime(g.gain.value, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur);
+}
+function sfx(kind) {
+  if (kind === 'place') tone(520, 0.09, 'triangle', 0.07);
+  else if (kind === 'back') tone(240, 0.10, 'sine', 0.06);
+  else if (kind === 'valid') tone(660, 0.13, 'triangle', 0.06);
+  else if (kind === 'chime') { tone(523, 0.18, 'sine', 0.06); setTimeout(() => tone(784, 0.22, 'sine', 0.05), 90); }
+  else if (kind === 'diana') { tone(523, 0.16, 'triangle', 0.07); setTimeout(() => tone(659, 0.16, 'triangle', 0.07), 110); setTimeout(() => tone(988, 0.3, 'triangle', 0.06), 220); }
+}
+function speak(text) {
+  if (muted || !('speechSynthesis' in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-ES'; u.rate = 1.0; u.pitch = 1.0;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+/* ===================== TEMA / SONIDO / AYUDA ===================== */
+const themeToggle = $('theme-toggle');
+function applyTheme(light) {
+  document.body.classList.toggle('light', light);
+  document.documentElement.classList.remove('pre-light');
+  $('theme-toggle') && document.querySelector('meta[name=theme-color]').setAttribute('content', light ? '#f3f2ee' : '#0b0b0c');
+  try { localStorage.setItem('galera_theme', light ? 'light' : 'dark'); } catch (e) {}
+}
+applyTheme(document.documentElement.classList.contains('pre-light'));
+themeToggle.addEventListener('click', () => applyTheme(!document.body.classList.contains('light')));
+
+const soundToggle = $('sound-toggle');
+function applyMute(m) { muted = m; soundToggle.classList.toggle('muted', m); try { localStorage.setItem('galera_sound', m ? 'off' : 'on'); } catch (e) {} }
+applyMute(muted);
+soundToggle.addEventListener('click', () => { applyMute(!muted); if (!muted) sfx('place'); });
+
+$('help-btn').addEventListener('click', () => $('tutorial-overlay').classList.add('visible'));
+$('tut-close').addEventListener('click', () => $('tutorial-overlay').classList.remove('visible'));
+
+/* ===================== TOAST ===================== */
+let toastT = null;
+function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2200); }
+
+/* ===================== NAVEGACIÓN DE PANTALLAS ===================== */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
+  $(id).classList.add('visible');
+  document.body.classList.toggle('in-game', id === 'screen-game');
+}
+
+/* ===================== DICCIONARIO ===================== */
+const DICT = new Set();
+const BYLEN = {}; for (let i = 3; i <= 9; i++) BYLEN[i] = [];
+let dictReady = false;
+
+async function loadDict() {
+  const res = await fetch('palabras.txt.gz');
+  if (!res.ok) throw new Error('no se pudo cargar el diccionario');
+  let text;
+  if ('DecompressionStream' in window) {
+    const ds = new DecompressionStream('gzip');
+    const stream = res.body.pipeThrough(ds);
+    text = await new Response(stream).text();
+  } else {
+    // Fallback: intentar versión sin comprimir
+    const r2 = await fetch('palabras.txt'); text = await r2.text();
+  }
+  let count = 0;
+  for (const line of text.split('\n')) {
+    const w = line.trim();
+    if (w.length < 3 || w.length > 9) continue;
+    DICT.add(w); BYLEN[w.length].push(w); count++;
+  }
+  dictReady = true;
+  return count;
+}
+
+/* ===================== LETRAS Y PESOS ===================== */
+const VOWELS = [['a', 12], ['e', 12], ['o', 9], ['i', 6], ['u', 5]];
+const CONSON = [['s', 6], ['n', 5], ['r', 5], ['d', 5], ['l', 4], ['t', 4], ['c', 4],
+                ['g', 2], ['m', 2], ['b', 2], ['p', 2], ['h', 2],
+                ['f', 1], ['v', 1], ['y', 1], ['q', 1], ['j', 1], ['z', 1], ['ñ', 1], ['x', 1], ['k', 1], ['w', 1]];
+function weightedPick(pool) {
+  let total = 0; for (const [, w] of pool) total += w;
+  let r = Math.random() * total;
+  for (const [ch, w] of pool) { r -= w; if (r <= 0) return ch; }
+  return pool[0][0];
+}
+function dealLetters() {
+  // single player: 5C/4V o 5V/4C al azar
+  const fiveVowels = Math.random() < 0.5;
+  const nV = fiveVowels ? 5 : 4, nC = 9 - nV;
+  const out = [];
+  for (let i = 0; i < nV; i++) out.push(weightedPick(VOWELS));
+  for (let i = 0; i < nC; i++) out.push(weightedPick(CONSON));
+  // mezclar
+  for (let i = out.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
+/* ===================== NORMALIZACIÓN / FORMABLE ===================== */
+const TRANS = { 'á':'a','é':'e','í':'i','ó':'o','ú':'u','ü':'u','à':'a','è':'e','ì':'i','ò':'o','ù':'u' };
+function normaliza(w) {
+  w = w.toLowerCase();
+  let out = '';
+  for (const c of w) out += (TRANS[c] || c);
+  return out;
+}
+function countLetters(arr) { const m = {}; for (const c of arr) m[c] = (m[c] || 0) + 1; return m; }
+function formable(word, rackCount) {
+  const need = {};
+  for (const c of word) { need[c] = (need[c] || 0) + 1; if ((need[c]) > (rackCount[c] || 0)) return false; }
+  return true;
+}
+function bestWord(rackCount) {
+  for (let L = 9; L >= 3; L--) {
+    const arr = BYLEN[L];
+    for (let i = 0; i < arr.length; i++) { if (formable(arr[i], rackCount)) return arr[i]; }
+  }
+  return '';
+}
+
+/* ===================== ESTADO DE PARTIDA ===================== */
+let totalRounds = 10, round = 0, score = 0;
+let rack = [], placed = [], rackCount = {};
+let history = [];
+let timer = null, timeLeft = 60, roundClosed = false;
+
+/* ===================== MODO TAP / DRAG ===================== */
+let dragMode = true;
+try { if (localStorage.getItem('galera_mode') === 'tap') dragMode = false; } catch (e) {}
+const modeToggle = $('mode-toggle'), modeLab = $('mode-lab');
+function applyMode() { modeToggle.classList.toggle('tap', !dragMode); modeLab.textContent = dragMode ? 'arrastrar' : 'tocar'; }
+applyMode();
+modeToggle.addEventListener('click', () => { dragMode = !dragMode; applyMode(); try { localStorage.setItem('galera_mode', dragMode ? 'drag' : 'tap'); } catch (e) {} });
+
+/* ===================== RENDER ===================== */
+function renderRack() {
+  const el = $('rack'); el.innerHTML = '';
+  rack.forEach((t, i) => {
+    const c = document.createElement('div');
+    c.className = 'cube letter' + (t.used ? ' used' : '');
+    c.textContent = t.ch.toUpperCase();
+    c.dataset.i = i;
+    el.appendChild(c);
+  });
+}
+function renderWord() {
+  const el = $('word'); el.innerHTML = '';
+  placed.forEach((idx, p) => {
+    const c = document.createElement('div');
+    c.className = 'cube letter';
+    c.textContent = rack[idx].ch.toUpperCase();
+    c.dataset.w = p;
+    el.appendChild(c);
+  });
+  if (placed.length === 0) {
+    const ph = document.createElement('div');
+    ph.className = 'slot letter'; ph.textContent = '·';
+    el.appendChild(ph);
+  }
+}
+function currentWord() { return normaliza(placed.map(i => rack[i].ch).join('')); }
+function checkWord() {
+  const w = currentWord();
+  const st = $('word-state'), wEl = $('word');
+  wEl.classList.remove('valid');
+  if (w.length === 0) { st.textContent = 'forma una palabra'; st.className = 'word-state'; return; }
+  if (w.length < 3) { st.textContent = w.length + ' · mínimo 3'; st.className = 'word-state'; return; }
+  if (DICT.has(w)) {
+    st.textContent = '✓ ' + w.length + (w.length === 9 ? ' · ¡redonda!' : ' letras');
+    st.className = 'word-state ok'; wEl.classList.add('valid');
+  } else {
+    st.textContent = 'no existe';
+    st.className = 'word-state bad';
+  }
+}
+
+/* ===================== COLOCAR / QUITAR ===================== */
+function placeFromRack(i) {
+  if (roundClosed || !rack[i] || rack[i].used) return;
+  rack[i].used = true; placed.push(i);
+  renderRack(); renderWord(); checkWord(); sfx('place');
+}
+function removeFromWord(p) {
+  if (roundClosed) return;
+  const idx = placed[p]; if (idx == null) return;
+  rack[idx].used = false; placed.splice(p, 1);
+  renderRack(); renderWord(); checkWord(); sfx('back');
+}
+
+/* ===================== MOTOR TAP / DRAG ===================== */
+let drag = null;
+const ghost = $('ghost');
+function startGhost(cube, e) {
+  ghost.textContent = cube.textContent;
+  ghost.style.display = 'flex';
+  ghost.style.width = cube.offsetWidth + 'px';
+  ghost.style.height = cube.offsetHeight + 'px';
+  moveGhost(e);
+}
+function moveGhost(e) { ghost.style.transform = 'translate(' + (e.clientX - ghost.offsetWidth / 2) + 'px,' + (e.clientY - ghost.offsetHeight / 2) + 'px)'; }
+function hideGhost() { ghost.style.display = 'none'; }
+function overWord(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#word')); }
+
+function onDown(e) {
+  if (roundClosed) return;
+  const cube = e.target.closest('[data-i],[data-w]'); if (!cube) return;
+  const from = cube.dataset.i !== undefined ? { type: 'rack', i: +cube.dataset.i } : { type: 'word', p: +cube.dataset.w };
+  if (from.type === 'rack' && rack[from.i] && rack[from.i].used) return;
+  drag = { from, x0: e.clientX, y0: e.clientY, moved: false };
+  if (dragMode) startGhost(cube, e);
+  try { cube.setPointerCapture(e.pointerId); } catch (err) {}
+}
+function onMove(e) {
+  if (!drag) return;
+  if (Math.abs(e.clientX - drag.x0) > 6 || Math.abs(e.clientY - drag.y0) > 6) drag.moved = true;
+  if (dragMode && drag.moved) { moveGhost(e); e.preventDefault(); }
+}
+function onUp(e) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (dragMode && d.moved) {
+    hideGhost();
+    if (d.from.type === 'rack' && overWord(e)) placeFromRack(d.from.i);
+    else if (d.from.type === 'word' && !overWord(e)) removeFromWord(d.from.p);
+  } else {
+    hideGhost();
+    if (d.from.type === 'rack') placeFromRack(d.from.i);
+    else removeFromWord(d.from.p);
+  }
+}
+const boardWrap = document.querySelector('.board-wrap');
+boardWrap.addEventListener('pointerdown', onDown);
+boardWrap.addEventListener('pointermove', onMove);
+boardWrap.addEventListener('pointerup', onUp);
+boardWrap.addEventListener('pointercancel', () => { drag = null; hideGhost(); });
+
+/* ===================== BOTONES DE JUEGO ===================== */
+$('btn-back1').addEventListener('click', () => { if (placed.length) removeFromWord(placed.length - 1); });
+$('btn-clear').addEventListener('click', () => { if (roundClosed) return; rack.forEach(t => t.used = false); placed = []; renderRack(); renderWord(); checkWord(); sfx('back'); });
+$('btn-stand').addEventListener('click', () => finishRound());
+
+/* ===================== FLUJO DE RONDA ===================== */
+function startRound() {
+  roundClosed = false;
+  const letters = dealLetters();
+  rack = letters.map(ch => ({ ch, used: false }));
+  rackCount = countLetters(letters);
+  placed = [];
+  renderRack(); renderWord(); checkWord();
+  $('st-round').textContent = round + '/' + totalRounds;
+  $('st-score').textContent = score;
+  timeLeft = 60; updateClock();
+  clearInterval(timer);
+  timer = setInterval(() => { timeLeft--; updateClock(); if (timeLeft <= 0) finishRound(); }, 1000);
+}
+function updateClock() {
+  const el = $('st-clock'); el.textContent = Math.max(0, timeLeft);
+  el.classList.toggle('warn', timeLeft <= 10);
+}
+function finishRound() {
+  if (roundClosed) return;
+  roundClosed = true;
+  clearInterval(timer);
+  const w = currentWord();
+  const valid = w.length >= 3 && DICT.has(w);
+  const len = valid ? w.length : 0;
+  const best = bestWord(rackCount);
+  const diana = valid && w.length === 9;
+  score += len;
+  history.push({ round, word: valid ? w : '', len, best });
+  revealRound(valid ? w : '', len, diana, best);
+}
+
+/* ===================== REVEAL ===================== */
+let revealWaiting = false;
+function revealRound(word, len, diana, best) {
+  const rv = $('reveal');
+  rv.classList.toggle('diana', diana);
+  $('r-round').textContent = 'ronda ' + round;
+  $('r-word').textContent = word ? word.toUpperCase() : '—';
+  $('r-dist').textContent = word
+    ? (diana ? '¡palabra redonda! las nueve letras' : len + ' letras')
+    : 'sin palabra esta ronda';
+  $('r-best').textContent = best ? ('lo más largo posible: ' + best.toUpperCase() + ' (' + best.length + ')') : '';
+  rv.classList.add('visible');
+  setTimeout(() => sfx(diana ? 'diana' : (word ? 'chime' : 'back')), 350);
+  setTimeout(() => {
+    if (word) speak(diana ? '¡Redonda! ' + word : word + '. ' + len + (len === 1 ? ' letra.' : ' letras.'));
+    else speak('Sin palabra. Lo más largo era ' + (best || '') + '.');
+  }, 800);
+  revealWaiting = true;
+  const cont = () => {
+    if (!revealWaiting) return; revealWaiting = false;
+    rv.classList.remove('visible');
+    rv.removeEventListener('click', cont);
+    if (round >= totalRounds) showFinal();
+    else { round++; startRound(); }
+  };
+  rv.addEventListener('click', cont);
+  setTimeout(cont, 3600);
+}
+
+/* ===================== RÉCORDS ===================== */
+function loadRecords() { try { return JSON.parse(localStorage.getItem('galera_records') || '{}'); } catch (e) { return {}; } }
+function saveRecords(r) { try { localStorage.setItem('galera_records', JSON.stringify(r)); } catch (e) {} }
+
+/* ===================== FINAL ===================== */
+function showFinal() {
+  const recs = loadRecords();
+  const key = 'best' + totalRounds;
+  const prev = recs[key] || 0;
+  const isRecord = score > prev;
+  if (isRecord) recs[key] = score;
+  // palabra más larga de la partida
+  let longestThis = '';
+  for (const h of history) if (h.word && h.word.length > longestThis.length) longestThis = h.word;
+  const prevLong = recs.longest || '';
+  let newLongest = false;
+  if (longestThis && longestThis.length > prevLong.length) { recs.longest = longestThis; newLongest = true; }
+  saveRecords(recs);
+
+  $('f-total').textContent = score;
+  $('f-best').textContent = longestThis ? longestThis.toUpperCase() : '—';
+  $('f-rounds').textContent = totalRounds;
+  $('f-sub').innerHTML = '<b>' + score + '</b> letras en <b>' + totalRounds + '</b> rondas';
+  let rec = '';
+  if (isRecord) rec += '¡nuevo récord de puntuación!';
+  if (newLongest) rec += (rec ? ' · ' : '') + 'mejor palabra de tu historia';
+  if (!rec) {
+    rec = 'récord (' + totalRounds + '): <b>' + (recs[key] || 0) + '</b>';
+    if (recs.longest) rec += ' · palabra más larga: <b>' + recs.longest.toUpperCase() + '</b>';
+  }
+  $('f-record').innerHTML = rec;
+  $('f-figure').textContent = score;
+  $('final').classList.add('visible');
+  setTimeout(() => sfx('diana'), 300);
+  setTimeout(() => speak(score + ' letras en ' + totalRounds + ' rondas.' + (isRecord ? ' ¡Nuevo récord!' : '')), 900);
+}
+
+/* ===================== INICIO DE PARTIDA ===================== */
+function beginGame() {
+  if (!dictReady) { toast('cargando diccionario…'); return; }
+  round = 1; score = 0; history = [];
+  show('screen-game');
+  startRound();
+}
+
+/* ===================== SELECTORES DE MENÚ ===================== */
+$('btn-solo').addEventListener('click', () => show('screen-setup'));
+$('btn-setup-back').addEventListener('click', () => show('screen-home'));
+document.querySelectorAll('#round-cards .card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('#round-cards .card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    totalRounds = +card.dataset.rounds;
+  });
+});
+$('btn-play').addEventListener('click', beginGame);
+$('btn-again').addEventListener('click', () => { $('final').classList.remove('visible'); beginGame(); });
+$('btn-home').addEventListener('click', () => { $('final').classList.remove('visible'); show('screen-home'); });
+
+/* ===================== PWA: INSTALAR ===================== */
+let deferredPrompt = null;
+const installBtn = $('install-btn');
+function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); deferredPrompt = e;
+  if (!isStandalone()) installBtn.classList.add('show');
+});
+window.addEventListener('appinstalled', () => { installBtn.classList.remove('show'); deferredPrompt = null; });
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    try { await deferredPrompt.userChoice; } catch (e) {}
+    deferredPrompt = null; installBtn.classList.remove('show');
+  } else {
+    toast('Usa el menú del navegador → «Instalar app» / «Añadir a inicio»');
+  }
+});
+// Fallback: si en 2.5s no llegó beforeinstallprompt y no está instalada, ofrecer botón con instrucciones
+setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.add('show'); }, 2500);
+
+/* ===================== ARRANQUE ===================== */
+(async function boot() {
+  try {
+    await loadDict();
+  } catch (e) {
+    toast('Error cargando el diccionario');
+  }
+  setTimeout(() => { const sp = $('app-splash'); sp.classList.add('hiding'); setTimeout(() => sp.remove(), 650); }, 500);
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
