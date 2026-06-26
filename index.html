@@ -321,6 +321,14 @@ body.light .word .slot, body.light .rack .slot {
 
 .f-record { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--amber); margin-top: .8rem; min-height: 1em; }
 .f-record b { color: var(--text); }
+
+/* reveal y final totalmente opacos (que no se vea el tablero detrás) */
+#reveal { background: var(--bg) !important; }
+#final { background: radial-gradient(ellipse at center, rgba(40,28,5,0.96), transparent 80%), var(--bg) !important; }
+body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,120,0.30), transparent 80%), var(--bg) !important; }
+
+/* resalte al arrastrar sobre una ficha de la bandeja (reordenar) */
+.rack .cube.dropok { box-shadow: 0 0 0 2px var(--amber), inset 0 2px 1px rgba(255,255,255,.2), 0 5px 0 var(--cube-edge), 0 8px 14px rgba(0,0,0,.5) !important; }
 </style>
 </head>
 <body>
@@ -817,13 +825,19 @@ function hideGhost() { ghost.style.display = 'none'; }
 function overWord(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#word')); }
 function overRack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#rack')); }
 function wordTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#word [data-p]'); return s ? +s.dataset.p : -1; }
-function highlightTarget(e) {
-  document.querySelectorAll('#word .dropok').forEach(x => x.classList.remove('dropok'));
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  const s = el && el.closest('#word [data-p]');
-  if (s) s.classList.add('dropok');
+function rackTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#rack [data-i]'); return s ? +s.dataset.i : -1; }
+function swapRack(i, j) {
+  if (i === j || !rack[i] || !rack[j] || rack[i].used || rack[j].used) { renderRack(); return; }
+  const t = rack[i]; rack[i] = rack[j]; rack[j] = t;
+  sfx('place'); renderRack();
 }
-function clearHighlight() { document.querySelectorAll('#word .dropok').forEach(x => x.classList.remove('dropok')); }
+function highlightTarget(e) {
+  document.querySelectorAll('.dropok').forEach(x => x.classList.remove('dropok'));
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const w = el && el.closest('#word [data-p]'); if (w) { w.classList.add('dropok'); return; }
+  const r = el && el.closest('#rack [data-i]'); if (r) r.classList.add('dropok');
+}
+function clearHighlight() { document.querySelectorAll('.dropok').forEach(x => x.classList.remove('dropok')); }
 
 function onDown(e) {
   if (roundClosed) return;
@@ -852,7 +866,11 @@ function onUp(e) {
     const tp = wordTargetIndex(e);
     if (d.from.type === 'rack') {
       if (tp >= 0) dropRackOnSlot(d.from.i, tp);
-      else renderRack();
+      else {
+        const rt = rackTargetIndex(e);
+        if (rt >= 0 && rt !== d.from.i) swapRack(d.from.i, rt);
+        else renderRack();
+      }
     } else {
       if (tp >= 0) dropSlotOnSlot(d.from.p, tp);
       else removeSlot(d.from.p);
@@ -1230,15 +1248,23 @@ function endGameOnline() {
   document.body.classList.remove('in-game'); clearInterval(timer); playMenuMusic();
   const pl = roomData.players || {};
   const arr = Object.entries(pl).map(([id, p]) => ({ id, ...p, score: p.score || 0 })).sort((a, b) => b.score - a.score);
+  const top = arr.length ? arr[0].score : 0;
+  const tiedTop = arr.filter(p => p.score === top && top > 0);
+  const isTie = tiedTop.length > 1;
   const winner = arr[0];
   $('final').classList.add('multi'); $('f-stats').style.display = 'none'; $('f-record').textContent = '';
   $('f-label').textContent = 'fin de la partida';
-  $('f-figure').textContent = winner ? winner.name : '—';
-  $('f-sub').innerHTML = '<b>' + (winner ? winner.score : 0) + '</b> puntos';
+  if (isTie) {
+    $('f-figure').textContent = 'Empate';
+    $('f-sub').innerHTML = '<b>' + top + '</b> puntos · ' + tiedTop.map(p => escapeHtml(p.name)).join(' y ');
+  } else {
+    $('f-figure').textContent = winner ? winner.name : '—';
+    $('f-sub').innerHTML = '<b>' + (winner ? winner.score : 0) + '</b> puntos';
+  }
   const st = $('f-standings'); st.innerHTML = '';
   arr.forEach((p, i) => {
     const row = document.createElement('div');
-    row.className = 'rk-row' + (p.id === myId ? ' me' : '') + (i === 0 ? ' win' : '');
+    row.className = 'rk-row' + (p.id === myId ? ' me' : '') + ((p.score === top && top > 0) ? ' win' : '');
     row.style.setProperty('--p-color', COLORS[p.colorIdx % COLORS.length]);
     row.innerHTML = '<span class="rk-pos">' + (i + 1) + '</span><span class="rk-dot"></span>' +
       '<span class="rk-nm">' + escapeHtml(p.name) + '</span><span class="rk-pts mono">' + p.score + '</span>';
@@ -1247,7 +1273,7 @@ function endGameOnline() {
   $('btn-again').textContent = 'Revancha'; $('btn-home').textContent = 'salir';
   $('final').classList.add('visible');
   setTimeout(() => sfx('diana'), 400);
-  setTimeout(() => speak(winner ? winner.name + ' gana con ' + winner.score + ' puntos.' : ''), 1300);
+  setTimeout(() => speak(isTie ? ('Empate a ' + top + ' puntos.') : (winner ? winner.name + ' gana con ' + winner.score + ' puntos.' : '')), 1300);
 }
 function requestRematch() {
   if (amHost) { rematchOnline(); return; }
@@ -1343,7 +1369,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.9';
+  $('app-version').textContent = 'v0.10';
   try {
     await loadDict();
   } catch (e) {
