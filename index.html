@@ -310,7 +310,7 @@ body.light .word .slot, body.light .rack .slot {
 </head>
 <body>
 
-<audio id="m-menu" src="Chuva_de_Confete.mp3" loop preload="none"></audio>
+<audio id="m-menu" src="Chuva_de_Confete.mp3" loop preload="auto"></audio>
 <audio id="m-1" src="Lluvia_En_Do.mp3" preload="none"></audio>
 <audio id="m-2" src="Lluvia_En_Do__1_.mp3" preload="none"></audio>
 <audio id="m-3" src="Violines_Alegres.mp3" preload="none"></audio>
@@ -459,6 +459,7 @@ function speak(text) {
 const mMenu = $('m-menu');
 const gameTracks = [$('m-1'), $('m-2'), $('m-3'), $('m-4')];
 let curGame = null;
+let menuStarting = false, gameStarting = false;
 mMenu.volume = 0.5;
 gameTracks.forEach(a => {
   a.volume = 0.42;
@@ -468,15 +469,19 @@ function stopMusic() { try { mMenu.pause(); } catch (e) {} gameTracks.forEach(a 
 function playMenuMusic() {
   if (muted) return;
   gameTracks.forEach(a => { try { a.pause(); } catch (e) {} }); curGame = null;
-  if (mMenu.paused) mMenu.play().catch(() => {});
+  if (!mMenu.paused || menuStarting) return;
+  menuStarting = true;
+  Promise.resolve(mMenu.play()).then(() => { menuStarting = false; }).catch(() => { menuStarting = false; });
 }
 function playGameMusic() {
   if (muted) { stopMusic(); return; }
+  if (gameStarting) return;
   try { mMenu.pause(); } catch (e) {}
   gameTracks.forEach(a => { try { a.pause(); } catch (e) {} });
   curGame = gameTracks[(Math.random() * gameTracks.length) | 0];
   try { curGame.currentTime = 0; } catch (e) {}
-  curGame.play().catch(() => {});
+  gameStarting = true;
+  Promise.resolve(curGame.play()).then(() => { gameStarting = false; }).catch(() => { gameStarting = false; });
 }
 
 /* ===================== TEMA / SONIDO / AYUDA ===================== */
@@ -655,6 +660,7 @@ function checkWord() {
   if (DICT.has(w)) {
     st.textContent = '✓ ' + w.length + (w.length === 9 ? ' · ¡redonda!' : ' letras');
     st.className = 'word-state ok'; wEl.classList.add('valid');
+    if (w.length > roundBest.length) { roundBest = w; saveBestIndicator(); }
   } else {
     st.textContent = 'no existe';
     st.className = 'word-state bad';
@@ -680,13 +686,7 @@ function clearWord() {
 }
 function tryAnother() {
   if (roundClosed) return;
-  const w = currentWord();
-  if (w.length >= 3 && DICT.has(w)) {
-    if (w.length > roundBest.length) { roundBest = w; saveBestIndicator(); }
-    toast('guardada: ' + w.toUpperCase()); sfx('valid');
-  } else if (w.length > 0) {
-    toast('no válida · no se guarda');
-  }
+  if (roundBest) toast('mejor guardada: ' + roundBest.toUpperCase() + ' · ' + roundBest.length);
   clearWord();
 }
 function dropRackOnSlot(i, p) {
@@ -931,7 +931,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.6';
+  $('app-version').textContent = 'v0.7';
   try {
     await loadDict();
   } catch (e) {
