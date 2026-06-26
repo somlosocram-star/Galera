@@ -254,34 +254,31 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 </style>
 <style>
 /* ===== Galera: añadidos sobre el shell ===== */
-/* La ficha de letra hereda .cube; solo ajustamos tamaño de fuente y mayúsculas */
 .cube.letter { font-size: 1.7rem; text-transform: uppercase; }
 .slot.letter { font-size: 1.5rem; text-transform: uppercase; }
 
-/* bandeja de 9 letras */
+/* bandeja de 9 letras (posiciones fijas) */
 .rack { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; max-width: 360px; }
-.rack .cube.used { opacity: .22; pointer-events: none; box-shadow: inset 0 2px 1px rgba(255,255,255,.08), inset 0 -3px 5px rgba(0,0,0,.25), 0 3px 0 var(--cube-edge); transform: scale(.94); }
+.rack .slot { opacity: .5; }
 
-/* tira de construcción de la palabra (hasta 9 huecos) */
+/* tira de construcción de la palabra (9 huecos fijos) */
 .word { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; min-height: 56px; align-items: center; }
-.word .slot { width: 50px; height: 56px; }
-.word .cube { width: 50px; height: 56px; }
+.word .slot, .word .cube { width: 50px; height: 56px; }
 .word.valid .cube { box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 0 1.5px var(--amber) inset; }
 
-/* línea de estado de la palabra (válida / no existe / longitud) */
 .word-state { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; min-height: 1.1em; color: var(--muted); margin-top: .3rem; }
 .word-state.ok { color: var(--amber); }
 .word-state.bad { color: var(--bad); }
 
-/* reveal: la palabra del jugador en grande */
+.round-best { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); min-height: 1.1em; margin-top: .15rem; }
+.round-best b { color: var(--amber); }
+
 #reveal .r-word { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: clamp(2rem,9vw,3rem); text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
 #reveal.diana .r-word { color: var(--amber); }
 
-/* botón instalar PWA */
 #install-btn { display: none; margin-top: 1rem; }
 #install-btn.show { display: inline-block; }
 
-/* récord en pantalla final */
 .f-record { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--amber); margin-top: .8rem; min-height: 1em; }
 .f-record b { color: var(--text); }
 </style>
@@ -349,13 +346,14 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
   <div class="board-wrap">
     <div class="word" id="word"></div>
     <div class="word-state" id="word-state">forma una palabra</div>
+    <div class="round-best" id="round-best"></div>
     <div class="rack" id="rack"></div>
     <div class="wait-veil" id="wait-veil"></div>
   </div>
   <div class="game-foot">
     <button class="btn-secondary btn" id="btn-back1">borrar</button>
-    <button class="btn-secondary btn" id="btn-clear">limpiar</button>
-    <button class="btn-secondary btn" id="btn-stand">plantarse</button>
+    <button class="btn-secondary btn" id="btn-try">intentar otra</button>
+    <button class="btn-secondary btn" id="btn-stand">terminar</button>
   </div>
 </div>
 
@@ -532,6 +530,9 @@ let totalRounds = 10, round = 0, score = 0;
 let rack = [], placed = [], rackCount = {};
 let history = [];
 let timer = null, timeLeft = 60, roundClosed = false;
+let roundBest = '';
+let draggingRackIdx = null, draggingWordP = null;
+const RACK_SIZE = 9;
 
 /* ===================== MODO TAP / DRAG ===================== */
 let dragMode = true;
@@ -545,29 +546,33 @@ modeToggle.addEventListener('click', () => { dragMode = !dragMode; applyMode(); 
 function renderRack() {
   const el = $('rack'); el.innerHTML = '';
   rack.forEach((t, i) => {
+    const hidden = t.used || i === draggingRackIdx;
     const c = document.createElement('div');
-    c.className = 'cube letter' + (t.used ? ' used' : '');
-    c.textContent = t.ch.toUpperCase();
-    c.dataset.i = i;
+    if (hidden) {
+      c.className = 'slot letter'; c.textContent = '·';
+    } else {
+      c.className = 'cube letter'; c.textContent = t.ch.toUpperCase(); c.dataset.i = i;
+    }
     el.appendChild(c);
   });
 }
 function renderWord() {
   const el = $('word'); el.innerHTML = '';
-  placed.forEach((idx, p) => {
+  for (let p = 0; p < RACK_SIZE; p++) {
+    const idx = placed[p];
     const c = document.createElement('div');
-    c.className = 'cube letter';
-    c.textContent = rack[idx].ch.toUpperCase();
-    c.dataset.w = p;
+    if (idx == null || p === draggingWordP) {
+      c.className = 'slot letter'; c.textContent = '·';
+    } else {
+      c.className = 'cube letter'; c.textContent = rack[idx].ch.toUpperCase(); c.dataset.w = p;
+    }
     el.appendChild(c);
-  });
-  if (placed.length === 0) {
-    const ph = document.createElement('div');
-    ph.className = 'slot letter'; ph.textContent = '·';
-    el.appendChild(ph);
   }
 }
 function currentWord() { return normaliza(placed.map(i => rack[i].ch).join('')); }
+function saveBestIndicator() {
+  $('round-best').innerHTML = roundBest ? ('mejor de la ronda: <b>' + roundBest.toUpperCase() + '</b> · ' + roundBest.length) : '';
+}
 function checkWord() {
   const w = currentWord();
   const st = $('word-state'), wEl = $('word');
@@ -585,7 +590,7 @@ function checkWord() {
 
 /* ===================== COLOCAR / QUITAR ===================== */
 function placeFromRack(i) {
-  if (roundClosed || !rack[i] || rack[i].used) return;
+  if (roundClosed || !rack[i] || rack[i].used || placed.length >= RACK_SIZE) return;
   rack[i].used = true; placed.push(i);
   renderRack(); renderWord(); checkWord(); sfx('place');
 }
@@ -594,6 +599,21 @@ function removeFromWord(p) {
   const idx = placed[p]; if (idx == null) return;
   rack[idx].used = false; placed.splice(p, 1);
   renderRack(); renderWord(); checkWord(); sfx('back');
+}
+function clearWord() {
+  rack.forEach(t => t.used = false); placed = [];
+  renderRack(); renderWord(); checkWord();
+}
+function tryAnother() {
+  if (roundClosed) return;
+  const w = currentWord();
+  if (w.length >= 3 && DICT.has(w)) {
+    if (w.length > roundBest.length) { roundBest = w; saveBestIndicator(); }
+    toast('guardada: ' + w.toUpperCase()); sfx('valid');
+  } else if (w.length > 0) {
+    toast('no válida · no se guarda');
+  }
+  clearWord();
 }
 
 /* ===================== MOTOR TAP / DRAG ===================== */
@@ -609,6 +629,7 @@ function startGhost(cube, e) {
 function moveGhost(e) { ghost.style.transform = 'translate(' + (e.clientX - ghost.offsetWidth / 2) + 'px,' + (e.clientY - ghost.offsetHeight / 2) + 'px)'; }
 function hideGhost() { ghost.style.display = 'none'; }
 function overWord(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#word')); }
+function overRack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#rack')); }
 
 function onDown(e) {
   if (roundClosed) return;
@@ -616,8 +637,12 @@ function onDown(e) {
   const from = cube.dataset.i !== undefined ? { type: 'rack', i: +cube.dataset.i } : { type: 'word', p: +cube.dataset.w };
   if (from.type === 'rack' && rack[from.i] && rack[from.i].used) return;
   drag = { from, x0: e.clientX, y0: e.clientY, moved: false };
-  if (dragMode) startGhost(cube, e);
-  try { cube.setPointerCapture(e.pointerId); } catch (err) {}
+  try { boardWrap.setPointerCapture(e.pointerId); } catch (err) {}
+  if (dragMode) {
+    startGhost(cube, e);
+    if (from.type === 'rack') { draggingRackIdx = from.i; renderRack(); }
+    else { draggingWordP = from.p; renderWord(); }
+  }
 }
 function onMove(e) {
   if (!drag) return;
@@ -627,12 +652,12 @@ function onMove(e) {
 function onUp(e) {
   if (!drag) return;
   const d = drag; drag = null;
+  hideGhost();
+  draggingRackIdx = null; draggingWordP = null;
   if (dragMode && d.moved) {
-    hideGhost();
-    if (d.from.type === 'rack' && overWord(e)) placeFromRack(d.from.i);
-    else if (d.from.type === 'word' && !overWord(e)) removeFromWord(d.from.p);
+    if (d.from.type === 'rack') { if (overWord(e)) placeFromRack(d.from.i); else renderRack(); }
+    else { if (!overWord(e)) removeFromWord(d.from.p); else renderWord(); }
   } else {
-    hideGhost();
     if (d.from.type === 'rack') placeFromRack(d.from.i);
     else removeFromWord(d.from.p);
   }
@@ -645,17 +670,19 @@ boardWrap.addEventListener('pointercancel', () => { drag = null; hideGhost(); })
 
 /* ===================== BOTONES DE JUEGO ===================== */
 $('btn-back1').addEventListener('click', () => { if (placed.length) removeFromWord(placed.length - 1); });
-$('btn-clear').addEventListener('click', () => { if (roundClosed) return; rack.forEach(t => t.used = false); placed = []; renderRack(); renderWord(); checkWord(); sfx('back'); });
+$('btn-try').addEventListener('click', tryAnother);
 $('btn-stand').addEventListener('click', () => finishRound());
 
 /* ===================== FLUJO DE RONDA ===================== */
 function startRound() {
   roundClosed = false;
+  roundBest = '';
   const letters = dealLetters();
   rack = letters.map(ch => ({ ch, used: false }));
   rackCount = countLetters(letters);
   placed = [];
-  renderRack(); renderWord(); checkWord();
+  draggingRackIdx = null; draggingWordP = null;
+  renderRack(); renderWord(); checkWord(); saveBestIndicator();
   $('st-round').textContent = round + '/' + totalRounds;
   $('st-score').textContent = score;
   timeLeft = 60; updateClock();
@@ -670,14 +697,16 @@ function finishRound() {
   if (roundClosed) return;
   roundClosed = true;
   clearInterval(timer);
+  // incorpora la palabra que esté en la tira si es válida y supera la mejor
   const w = currentWord();
-  const valid = w.length >= 3 && DICT.has(w);
-  const len = valid ? w.length : 0;
+  if (w.length >= 3 && DICT.has(w) && w.length > roundBest.length) roundBest = w;
+  const len = roundBest.length;
+  const valid = len > 0;
   const best = bestWord(rackCount);
-  const diana = valid && w.length === 9;
+  const diana = valid && len === 9;
   score += len;
-  history.push({ round, word: valid ? w : '', len, best });
-  revealRound(valid ? w : '', len, diana, best);
+  history.push({ round, word: roundBest, len, best });
+  revealRound(valid ? roundBest : '', len, diana, best);
 }
 
 /* ===================== REVEAL ===================== */
