@@ -257,17 +257,26 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 .cube.letter { font-size: 1.7rem; text-transform: uppercase; }
 .slot.letter { font-size: 1.5rem; text-transform: uppercase; }
 
+/* huecos con aspecto de compartimento real (hundido, sin punto ni borde de puntos) */
+.word .slot, .rack .slot {
+  border: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--hole) 70%, #000) 0%, var(--hole) 100%);
+  box-shadow: inset 0 6px 11px rgba(0,0,0,.62), inset 0 -2px 2px rgba(255,255,255,.05), inset 0 2px 2px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.04);
+  color: transparent;
+}
+body.light .word .slot, body.light .rack .slot {
+  box-shadow: inset 0 5px 10px rgba(120,115,100,.4), inset 0 -1px 1px rgba(255,255,255,.6), inset 0 2px 3px rgba(120,115,100,.3);
+}
+
 /* bandeja de 9 letras (posiciones fijas) */
 .rack { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; max-width: 360px; }
-.rack .slot { opacity: .5; }
 
 /* tira de la palabra: SIEMPRE una fila, huecos que se ajustan al ancho */
 .word { display: flex; flex-wrap: nowrap; gap: clamp(2px, 1.2vw, 5px); justify-content: center; align-items: center; width: 100%; max-width: 440px; margin: 0 auto; min-height: 54px; }
 .word .slot, .word .cube { width: clamp(30px, 9.2vw, 46px); height: clamp(42px, 12vw, 54px); flex: 0 0 auto; }
 .word .cube.letter { font-size: clamp(1rem, 5.2vw, 1.55rem); }
-.word .slot.letter { font-size: clamp(.8rem, 4vw, 1.3rem); }
 .word.valid .cube { box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 0 1.5px var(--amber) inset; }
-.word .dropok { border-color: var(--amber) !important; border-style: solid !important; box-shadow: 0 0 0 2px var(--amber) inset, inset 0 5px 9px rgba(0,0,0,.4) !important; }
+.word .dropok { box-shadow: inset 0 0 0 2px var(--amber), inset 0 6px 11px rgba(0,0,0,.5) !important; background: color-mix(in srgb, var(--amber) 14%, var(--hole)) !important; }
 
 .word-state { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; min-height: 1.1em; color: var(--muted); margin-top: .3rem; }
 .word-state.ok { color: var(--amber); }
@@ -282,11 +291,21 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 #install-btn { display: none; margin-top: 1rem; }
 #install-btn.show { display: inline-block; }
 
+/* versión, en la home, abajo y pequeña */
+.app-version { font-family: 'IBM Plex Mono', monospace; font-size: .5rem; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; opacity: .55; }
+#screen-home .app-version { position: absolute; left: 0; right: 0; bottom: max(1rem, env(safe-area-inset-bottom)); text-align: center; }
+
 .f-record { font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--amber); margin-top: .8rem; min-height: 1em; }
 .f-record b { color: var(--text); }
 </style>
 </head>
 <body>
+
+<audio id="m-menu" src="Chuva_de_Confete.mp3" loop preload="none"></audio>
+<audio id="m-1" src="Lluvia_En_Do.mp3" preload="none"></audio>
+<audio id="m-2" src="Lluvia_En_Do__1_.mp3" preload="none"></audio>
+<audio id="m-3" src="Violines_Alegres.mp3" preload="none"></audio>
+<audio id="m-4" src="Violines_Alegres__1_.mp3" preload="none"></audio>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"></svg>
 
@@ -316,6 +335,7 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
     <button class="btn btn-soon" id="btn-online" disabled>Jugar online</button>
     <button class="btn-secondary btn" id="install-btn">Instalar app</button>
   </div>
+  <div class="app-version" id="app-version"></div>
 </div>
 
 <!-- SETUP -->
@@ -426,6 +446,30 @@ function speak(text) {
   } catch (e) {}
 }
 
+/* ===================== MÚSICA ===================== */
+const mMenu = $('m-menu');
+const gameTracks = [$('m-1'), $('m-2'), $('m-3'), $('m-4')];
+let curGame = null;
+mMenu.volume = 0.5;
+gameTracks.forEach(a => {
+  a.volume = 0.42;
+  a.addEventListener('ended', () => { if (!muted && document.body.classList.contains('in-game')) playGameMusic(); });
+});
+function stopMusic() { try { mMenu.pause(); } catch (e) {} gameTracks.forEach(a => { try { a.pause(); } catch (e) {} }); curGame = null; }
+function playMenuMusic() {
+  if (muted) return;
+  gameTracks.forEach(a => { try { a.pause(); } catch (e) {} }); curGame = null;
+  if (mMenu.paused) mMenu.play().catch(() => {});
+}
+function playGameMusic() {
+  if (muted) { stopMusic(); return; }
+  try { mMenu.pause(); } catch (e) {}
+  gameTracks.forEach(a => { try { a.pause(); } catch (e) {} });
+  curGame = gameTracks[(Math.random() * gameTracks.length) | 0];
+  try { curGame.currentTime = 0; } catch (e) {}
+  curGame.play().catch(() => {});
+}
+
 /* ===================== TEMA / SONIDO / AYUDA ===================== */
 const themeToggle = $('theme-toggle');
 function applyTheme(light) {
@@ -440,7 +484,11 @@ themeToggle.addEventListener('click', () => applyTheme(!document.body.classList.
 const soundToggle = $('sound-toggle');
 function applyMute(m) { muted = m; soundToggle.classList.toggle('muted', m); try { localStorage.setItem('galera_sound', m ? 'off' : 'on'); } catch (e) {} }
 applyMute(muted);
-soundToggle.addEventListener('click', () => { applyMute(!muted); if (!muted) sfx('place'); });
+soundToggle.addEventListener('click', () => {
+  applyMute(!muted);
+  if (muted) stopMusic();
+  else { sfx('place'); if (document.body.classList.contains('in-game')) playGameMusic(); else playMenuMusic(); }
+});
 
 $('help-btn').addEventListener('click', () => $('tutorial-overlay').classList.add('visible'));
 $('tut-close').addEventListener('click', () => $('tutorial-overlay').classList.remove('visible'));
@@ -454,6 +502,8 @@ function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
   $(id).classList.add('visible');
   document.body.classList.toggle('in-game', id === 'screen-game');
+  if (id === 'screen-game') { if (!curGame) playGameMusic(); }
+  else playMenuMusic();
 }
 
 /* ===================== DICCIONARIO ===================== */
@@ -530,7 +580,7 @@ function bestWord(rackCount) {
 
 /* ===================== ESTADO DE PARTIDA ===================== */
 let totalRounds = 10, round = 0, score = 0;
-let rack = [], placed = [], rackCount = {};
+let rack = [], slots = new Array(9).fill(null), rackCount = {};
 let history = [];
 let timer = null, timeLeft = 60, roundClosed = false;
 let roundBest = '';
@@ -552,7 +602,7 @@ function renderRack() {
     const hidden = t.used || i === draggingRackIdx;
     const c = document.createElement('div');
     if (hidden) {
-      c.className = 'slot letter'; c.textContent = '·';
+      c.className = 'slot letter'; c.textContent = '';
     } else {
       c.className = 'cube letter'; c.textContent = t.ch.toUpperCase(); c.dataset.i = i;
     }
@@ -562,18 +612,20 @@ function renderRack() {
 function renderWord() {
   const el = $('word'); el.innerHTML = '';
   for (let p = 0; p < RACK_SIZE; p++) {
-    const idx = placed[p];
+    const idx = slots[p];
     const c = document.createElement('div');
     c.dataset.p = p;
     if (idx == null || p === draggingWordP) {
-      c.className = 'slot letter'; c.textContent = '·';
+      c.className = 'slot letter'; c.textContent = '';
     } else {
       c.className = 'cube letter'; c.textContent = rack[idx].ch.toUpperCase(); c.dataset.w = p;
     }
     el.appendChild(c);
   }
 }
-function currentWord() { return normaliza(placed.map(i => rack[i].ch).join('')); }
+function currentWord() { return normaliza(slots.filter(i => i != null).map(i => rack[i].ch).join('')); }
+function firstEmpty() { for (let p = 0; p < RACK_SIZE; p++) if (slots[p] == null) return p; return -1; }
+function lastFilled() { for (let p = RACK_SIZE - 1; p >= 0; p--) if (slots[p] != null) return p; return -1; }
 function saveBestIndicator() {
   $('round-best').innerHTML = roundBest ? ('mejor de la ronda: <b>' + roundBest.toUpperCase() + '</b> · ' + roundBest.length) : '';
 }
@@ -594,43 +646,19 @@ function checkWord() {
 
 /* ===================== COLOCAR / QUITAR ===================== */
 function placeFromRack(i) {
-  if (roundClosed || !rack[i] || rack[i].used || placed.length >= RACK_SIZE) return;
-  rack[i].used = true; placed.push(i);
+  if (roundClosed || !rack[i] || rack[i].used) return;
+  const p = firstEmpty(); if (p < 0) return;
+  slots[p] = i; rack[i].used = true;
   renderRack(); renderWord(); checkWord(); sfx('place');
 }
-function removeFromWord(p) {
+function removeSlot(p) {
   if (roundClosed) return;
-  const idx = placed[p]; if (idx == null) return;
-  rack[idx].used = false; placed.splice(p, 1);
+  const idx = slots[p]; if (idx == null) return;
+  rack[idx].used = false; slots[p] = null;
   renderRack(); renderWord(); checkWord(); sfx('back');
 }
 function clearWord() {
-  rack.forEach(t => t.used = false); placed = [];
-  renderRack(); renderWord(); checkWord();
-}
-function dropRackOnWord(i, tp) {
-  if (rack[i].used) return;
-  if (tp < placed.length) {
-    // hueco ocupado → intercambio: la que estaba vuelve a la bolsa
-    const old = placed[tp];
-    rack[old].used = false;
-    placed[tp] = i; rack[i].used = true;
-    sfx('place');
-  } else if (placed.length < RACK_SIZE) {
-    placed.push(i); rack[i].used = true; sfx('place');
-  }
-  renderRack(); renderWord(); checkWord();
-}
-function dropWordOnWord(p0, tp) {
-  if (tp === p0) { renderRack(); renderWord(); return; }
-  if (tp < placed.length) {
-    // intercambio dentro de la palabra
-    const tmp = placed[p0]; placed[p0] = placed[tp]; placed[tp] = tmp;
-  } else {
-    // a hueco vacío → mover al final (reordenar)
-    const v = placed.splice(p0, 1)[0]; placed.push(v);
-  }
-  sfx('place');
+  rack.forEach(t => t.used = false); slots = new Array(9).fill(null);
   renderRack(); renderWord(); checkWord();
 }
 function tryAnother() {
@@ -643,6 +671,28 @@ function tryAnother() {
     toast('no válida · no se guarda');
   }
   clearWord();
+}
+function dropRackOnSlot(i, p) {
+  if (rack[i].used) return;
+  if (slots[p] == null) {
+    slots[p] = i; rack[i].used = true;
+  } else {
+    // hueco ocupado → intercambio: la que estaba vuelve a la bolsa
+    const old = slots[p]; rack[old].used = false;
+    slots[p] = i; rack[i].used = true;
+  }
+  sfx('place'); renderRack(); renderWord(); checkWord();
+}
+function dropSlotOnSlot(p0, p1) {
+  if (p0 === p1) { renderRack(); renderWord(); return; }
+  if (slots[p1] == null) {
+    // mover a hueco vacío, dejando hueco en el origen
+    slots[p1] = slots[p0]; slots[p0] = null;
+  } else {
+    // intercambio entre dos letras
+    const tmp = slots[p0]; slots[p0] = slots[p1]; slots[p1] = tmp;
+  }
+  sfx('place'); renderRack(); renderWord(); checkWord();
 }
 
 /* ===================== MOTOR TAP / DRAG ===================== */
@@ -694,15 +744,15 @@ function onUp(e) {
   if (dragMode && d.moved) {
     const tp = wordTargetIndex(e);
     if (d.from.type === 'rack') {
-      if (tp >= 0) dropRackOnWord(d.from.i, tp);
+      if (tp >= 0) dropRackOnSlot(d.from.i, tp);
       else renderRack();
     } else {
-      if (tp >= 0) dropWordOnWord(d.from.p, tp);
-      else removeFromWord(d.from.p);
+      if (tp >= 0) dropSlotOnSlot(d.from.p, tp);
+      else removeSlot(d.from.p);
     }
   } else {
     if (d.from.type === 'rack') placeFromRack(d.from.i);
-    else removeFromWord(d.from.p);
+    else removeSlot(d.from.p);
   }
 }
 const boardWrap = document.querySelector('.board-wrap');
@@ -712,7 +762,7 @@ boardWrap.addEventListener('pointerup', onUp);
 boardWrap.addEventListener('pointercancel', () => { drag = null; hideGhost(); });
 
 /* ===================== BOTONES DE JUEGO ===================== */
-$('btn-back1').addEventListener('click', () => { if (placed.length) removeFromWord(placed.length - 1); });
+$('btn-back1').addEventListener('click', () => { const p = lastFilled(); if (p >= 0) removeSlot(p); });
 $('btn-try').addEventListener('click', tryAnother);
 $('btn-stand').addEventListener('click', () => finishRound());
 
@@ -723,7 +773,7 @@ function startRound() {
   const letters = dealLetters();
   rack = letters.map(ch => ({ ch, used: false }));
   rackCount = countLetters(letters);
-  placed = [];
+  slots = new Array(9).fill(null);
   draggingRackIdx = null; draggingWordP = null;
   renderRack(); renderWord(); checkWord(); saveBestIndicator();
   $('st-round').textContent = round + '/' + totalRounds;
@@ -814,6 +864,7 @@ function showFinal() {
   $('f-record').innerHTML = rec;
   $('f-figure').textContent = score;
   $('final').classList.add('visible');
+  playMenuMusic();
   setTimeout(() => sfx('diana'), 300);
   setTimeout(() => speak(score + ' letras en ' + totalRounds + ' rondas.' + (isRecord ? ' ¡Nuevo récord!' : '')), 900);
 }
@@ -863,6 +914,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
+  $('app-version').textContent = 'v1.0';
   try {
     await loadDict();
   } catch (e) {
