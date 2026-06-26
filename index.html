@@ -261,10 +261,13 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 .rack { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; max-width: 360px; }
 .rack .slot { opacity: .5; }
 
-/* tira de construcción de la palabra (9 huecos fijos) */
-.word { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; min-height: 56px; align-items: center; }
-.word .slot, .word .cube { width: 50px; height: 56px; }
+/* tira de la palabra: SIEMPRE una fila, huecos que se ajustan al ancho */
+.word { display: flex; flex-wrap: nowrap; gap: clamp(2px, 1.2vw, 5px); justify-content: center; align-items: center; width: 100%; max-width: 440px; margin: 0 auto; min-height: 54px; }
+.word .slot, .word .cube { width: clamp(30px, 9.2vw, 46px); height: clamp(42px, 12vw, 54px); flex: 0 0 auto; }
+.word .cube.letter { font-size: clamp(1rem, 5.2vw, 1.55rem); }
+.word .slot.letter { font-size: clamp(.8rem, 4vw, 1.3rem); }
 .word.valid .cube { box-shadow: inset 0 2px 1px rgba(255,255,255,.14), inset 0 -4px 6px rgba(0,0,0,.3), 0 5px 0 var(--cube-edge), 0 8px 11px rgba(0,0,0,.4), 0 0 0 1.5px var(--amber) inset; }
+.word .dropok { border-color: var(--amber) !important; border-style: solid !important; box-shadow: 0 0 0 2px var(--amber) inset, inset 0 5px 9px rgba(0,0,0,.4) !important; }
 
 .word-state { font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; min-height: 1.1em; color: var(--muted); margin-top: .3rem; }
 .word-state.ok { color: var(--amber); }
@@ -561,6 +564,7 @@ function renderWord() {
   for (let p = 0; p < RACK_SIZE; p++) {
     const idx = placed[p];
     const c = document.createElement('div');
+    c.dataset.p = p;
     if (idx == null || p === draggingWordP) {
       c.className = 'slot letter'; c.textContent = '·';
     } else {
@@ -604,6 +608,31 @@ function clearWord() {
   rack.forEach(t => t.used = false); placed = [];
   renderRack(); renderWord(); checkWord();
 }
+function dropRackOnWord(i, tp) {
+  if (rack[i].used) return;
+  if (tp < placed.length) {
+    // hueco ocupado → intercambio: la que estaba vuelve a la bolsa
+    const old = placed[tp];
+    rack[old].used = false;
+    placed[tp] = i; rack[i].used = true;
+    sfx('place');
+  } else if (placed.length < RACK_SIZE) {
+    placed.push(i); rack[i].used = true; sfx('place');
+  }
+  renderRack(); renderWord(); checkWord();
+}
+function dropWordOnWord(p0, tp) {
+  if (tp === p0) { renderRack(); renderWord(); return; }
+  if (tp < placed.length) {
+    // intercambio dentro de la palabra
+    const tmp = placed[p0]; placed[p0] = placed[tp]; placed[tp] = tmp;
+  } else {
+    // a hueco vacío → mover al final (reordenar)
+    const v = placed.splice(p0, 1)[0]; placed.push(v);
+  }
+  sfx('place');
+  renderRack(); renderWord(); checkWord();
+}
 function tryAnother() {
   if (roundClosed) return;
   const w = currentWord();
@@ -630,6 +659,14 @@ function moveGhost(e) { ghost.style.transform = 'translate(' + (e.clientX - ghos
 function hideGhost() { ghost.style.display = 'none'; }
 function overWord(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#word')); }
 function overRack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#rack')); }
+function wordTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#word [data-p]'); return s ? +s.dataset.p : -1; }
+function highlightTarget(e) {
+  document.querySelectorAll('#word .dropok').forEach(x => x.classList.remove('dropok'));
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const s = el && el.closest('#word [data-p]');
+  if (s) s.classList.add('dropok');
+}
+function clearHighlight() { document.querySelectorAll('#word .dropok').forEach(x => x.classList.remove('dropok')); }
 
 function onDown(e) {
   if (roundClosed) return;
@@ -647,16 +684,22 @@ function onDown(e) {
 function onMove(e) {
   if (!drag) return;
   if (Math.abs(e.clientX - drag.x0) > 6 || Math.abs(e.clientY - drag.y0) > 6) drag.moved = true;
-  if (dragMode && drag.moved) { moveGhost(e); e.preventDefault(); }
+  if (dragMode && drag.moved) { moveGhost(e); highlightTarget(e); e.preventDefault(); }
 }
 function onUp(e) {
   if (!drag) return;
   const d = drag; drag = null;
-  hideGhost();
+  hideGhost(); clearHighlight();
   draggingRackIdx = null; draggingWordP = null;
   if (dragMode && d.moved) {
-    if (d.from.type === 'rack') { if (overWord(e)) placeFromRack(d.from.i); else renderRack(); }
-    else { if (!overWord(e)) removeFromWord(d.from.p); else renderWord(); }
+    const tp = wordTargetIndex(e);
+    if (d.from.type === 'rack') {
+      if (tp >= 0) dropRackOnWord(d.from.i, tp);
+      else renderRack();
+    } else {
+      if (tp >= 0) dropWordOnWord(d.from.p, tp);
+      else removeFromWord(d.from.p);
+    }
   } else {
     if (d.from.type === 'rack') placeFromRack(d.from.i);
     else removeFromWord(d.from.p);
