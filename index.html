@@ -257,6 +257,21 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 .cube.letter { font-size: 1.7rem; text-transform: uppercase; }
 .slot.letter { font-size: 1.5rem; text-transform: uppercase; }
 
+/* fichas con más vida en modo oscuro: brillo arriba, canto visible, reflejo de tecla */
+body:not(.light) .cube.letter {
+  background: linear-gradient(168deg, #45454d 0%, #26262b 58%, #1a1a1e 100%);
+  box-shadow:
+    inset 0 2px 1px rgba(255,255,255,.32),
+    inset 0 -4px 7px rgba(0,0,0,.45),
+    0 5px 0 #101013,
+    0 9px 16px rgba(0,0,0,.6),
+    0 0 14px rgba(255,255,255,.06);
+}
+body:not(.light) .cube.letter::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(158deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 38%);
+}
+
 /* huecos: compartimento hundido con contorno de luz neón */
 .word .slot, .rack .slot {
   border: none;
@@ -931,7 +946,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.7';
+  $('app-version').textContent = 'v0.8';
   try {
     await loadDict();
   } catch (e) {
