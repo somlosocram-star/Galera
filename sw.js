@@ -1,5 +1,5 @@
 /* Service worker de Galera — HTML siempre fresco, assets y diccionario en caché */
-const CACHE = 'galera-v0_16';
+const CACHE = 'galera-v0_17';
 
 const SHELL = [
   './',

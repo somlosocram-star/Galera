@@ -821,7 +821,7 @@ function lastFilledSlot() { for (let p = RACK_SIZE - 1; p >= 0; p--) if (slots[p
 function saveBestIndicator() {
   if (gameMode === 'multi' || gameMode === 'sopa') {
     if (roundWords.length) $('round-best').innerHTML = 'palabras (' + roundWords.length + '): ' + roundWords.map(w => w.toUpperCase()).join(' · ') + ' · <b>' + roundScore + '</b>';
-    else $('round-best').innerHTML = (gameMode === 'sopa') ? 'arrastra el dedo para buscar palabras' : 'añade palabras: cada una suma sus letras';
+    else $('round-best').innerHTML = (gameMode === 'sopa') ? 'arrastra para buscar · hay una de 9 letras que vale +10' : 'añade palabras: cada una suma sus letras';
   } else {
     $('round-best').innerHTML = roundBest ? ('mejor de la ronda: <b>' + roundBest.toUpperCase() + '</b> · ' + roundBest.length) : '';
   }
@@ -984,26 +984,35 @@ const SOUP_DIRS = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [
 const SOUP_FILL_V = [['a', 12], ['e', 12], ['o', 9], ['i', 6], ['u', 5]];
 const SOUP_FILL_C = [['s', 6], ['n', 5], ['r', 5], ['d', 5], ['l', 4], ['t', 4], ['c', 4], ['m', 3], ['p', 3], ['b', 2], ['g', 2], ['h', 2], ['f', 1], ['v', 1], ['j', 1], ['z', 1]];
 function soupFill() { return weightedPick(Math.random() < 0.42 ? SOUP_FILL_V : SOUP_FILL_C); }
+function soupPick(L) {
+  const pool = BYLEN[L]; if (!pool || !pool.length) return null;
+  for (let t = 0; t < 30; t++) { const w = pool[(Math.random() * pool.length) | 0]; if (!/[kwq]/.test(w)) return w; }
+  return null;
+}
+function soupPlant(g, word, N) {
+  const L = word.length, opts = [];
+  for (const [dr, dc] of SOUP_DIRS) for (let r0 = 0; r0 < N; r0++) for (let c0 = 0; c0 < N; c0++) {
+    const rE = r0 + dr * (L - 1), cE = c0 + dc * (L - 1);
+    if (rE < 0 || rE >= N || cE < 0 || cE >= N) continue;
+    let ok = true;
+    for (let i = 0; i < L; i++) { const rr = r0 + dr * i, cc = c0 + dc * i; if (g[rr][cc] !== null && g[rr][cc] !== word[i]) { ok = false; break; } }
+    if (ok) opts.push([r0, c0, dr, dc]);
+  }
+  if (!opts.length) return false;
+  const [r0, c0, dr, dc] = opts[(Math.random() * opts.length) | 0];
+  for (let i = 0; i < L; i++) g[r0 + dr * i][c0 + dc * i] = word[i];
+  return true;
+}
 function buildSoup(N) {
   const g = Array.from({ length: N }, () => new Array(N).fill(null));
-  let planted = 0, attempts = 0;
+  const w9 = soupPick(9); if (w9) soupPlant(g, w9, N);                                  // 1 de 9 garantizada (joya)
+  let c8 = 0; for (let t = 0; t < 30 && c8 < 3; t++) { const w = soupPick(8); if (w && soupPlant(g, w, N)) c8++; }   // 3 de 8 extra
+  let planted = 0, attempts = 0;                                                        // relleno al azar (4-8) como antes
   while (planted < 12 && attempts < 700) {
     attempts++;
     const L = 4 + ((Math.random() * 5) | 0);
-    const pool = BYLEN[L]; if (!pool || !pool.length) continue;
-    const word = pool[(Math.random() * pool.length) | 0];
-    if (/[kwq]/.test(word)) continue;
-    const [dr, dc] = SOUP_DIRS[(Math.random() * SOUP_DIRS.length) | 0];
-    for (let t = 0; t < 25; t++) {
-      const r0 = (Math.random() * N) | 0, c0 = (Math.random() * N) | 0;
-      const rE = r0 + dr * (L - 1), cE = c0 + dc * (L - 1);
-      if (rE < 0 || rE >= N || cE < 0 || cE >= N) continue;
-      let ok = true;
-      for (let i = 0; i < L; i++) { const rr = r0 + dr * i, cc = c0 + dc * i; if (g[rr][cc] !== null && g[rr][cc] !== word[i]) { ok = false; break; } }
-      if (!ok) continue;
-      for (let i = 0; i < L; i++) g[r0 + dr * i][c0 + dc * i] = word[i];
-      planted++; break;
-    }
+    const w = soupPick(L); if (!w) continue;
+    if (soupPlant(g, w, N)) planted++;
   }
   for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (g[r][c] === null) g[r][c] = soupFill();
   return g.map(row => row.join(''));
@@ -1074,10 +1083,14 @@ function onSoupUp(e) {
   if (DICT.has(letters)) w = letters; else if (DICT.has(rev)) w = rev;
   if (!w) { soupMiss(cells); return; }
   if (soupFound.indexOf(w) >= 0) { soupMiss(cells); toast('ya la tienes'); return; }
-  soupFound.push(w); roundScore += w.length; roundWords = soupFound.slice();
+  soupFound.push(w);
+  const bonus = w.length === 9 ? 10 : 0;
+  roundScore += w.length + bonus; roundWords = soupFound.slice();
   const wrap = $('soup');
   for (const [r, c] of cells) { soupCells[r + ',' + c] = true; const el = wrap.children[r * SOUP_N + c]; if (el) el.classList.add('found'); }
-  saveBestIndicator(); toast('+' + w.length + ' · ' + w.toUpperCase()); sfx('valid');
+  saveBestIndicator();
+  toast('+' + (w.length + bonus) + ' · ' + w.toUpperCase() + (bonus ? ' ¡joya! +10' : ''));
+  sfx(bonus ? 'diana' : 'valid');
 }
 function soupMiss(cells) {
   const wrap = $('soup');
@@ -1663,7 +1676,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.16';
+  $('app-version').textContent = 'v0.17';
   try {
     await loadDict();
   } catch (e) {
