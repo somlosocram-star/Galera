@@ -332,9 +332,38 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 .rack .slot.dropok { box-shadow: inset 0 5px 9px rgba(0,0,0,.5), 0 0 0 2px var(--amber), 0 0 10px rgba(212,99,42,.4) !important; }
 
 /* tarjetas de selección de modo */
-.mode-cards .card { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: .7rem .5rem; }
-.mode-cards .c-name { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; }
-.mode-cards .c-desc { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
+/* tarjetas de selección de modo: anchas, texto completo, sin recorte */
+.mode-cards { gap: .7rem; }
+.mode-cards .card { width: 150px; overflow: visible; padding: .8rem .5rem; }
+.mode-cards .c-name { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; text-transform: none; letter-spacing: .01em; white-space: nowrap; line-height: 1.05; color: var(--text); margin-top: 0; }
+.mode-cards .c-desc { font-family: 'IBM Plex Mono', monospace; font-size: .54rem; letter-spacing: .04em; text-transform: uppercase; opacity: .6; text-align: center; margin-top: .25rem; line-height: 1.3; }
+
+/* ===== volumen en botones y tarjetas (relieve de tecla) ===== */
+:root { --btn-top: #2c2c32; --btn-bot: #202024; --btn-edge: #0b0b0d; }
+body.light { --btn-top: #ffffff; --btn-bot: #ece9e1; --btn-edge: #d0c9b9; }
+.btn, .btn-secondary { border-radius: 12px; transition: transform .12s ease, box-shadow .12s ease, background .2s, color .2s; }
+.btn {
+  background: linear-gradient(180deg, var(--btn-top) 0%, var(--btn-bot) 100%);
+  box-shadow: 0 4px 0 var(--btn-edge), 0 7px 14px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.45);
+}
+.btn:hover, .btn:active {
+  background: linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, #000) 100%);
+  color: var(--on-accent);
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--btn-edge), 0 2px 6px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.2); }
+.btn:disabled { box-shadow: 0 4px 0 var(--btn-edge), 0 7px 14px rgba(0,0,0,.18); }
+.btn-secondary {
+  background: linear-gradient(180deg, var(--btn-top) 0%, var(--btn-bot) 100%);
+  box-shadow: 0 3px 0 var(--btn-edge), 0 5px 10px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.btn-secondary:hover, .btn-secondary:active { background: linear-gradient(180deg, var(--btn-top) 0%, var(--btn-bot) 100%); }
+.btn-secondary:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--btn-edge), 0 2px 5px rgba(0,0,0,.16); }
+.card {
+  box-shadow: 0 4px 0 var(--btn-edge), 0 7px 14px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.4);
+  transition: transform .12s ease, box-shadow .15s ease, border-color .2s, background .2s;
+}
+.card:active { transform: translateY(2px); }
+.card.selected { transform: translateY(1px); box-shadow: 0 3px 0 var(--btn-edge), 0 6px 12px rgba(0,0,0,.16), 0 0 0 1px var(--accent) inset; }
 </style>
 </head>
 <body>
@@ -1468,7 +1497,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.11';
+  $('app-version').textContent = 'v0.12';
   try {
     await loadDict();
   } catch (e) {
