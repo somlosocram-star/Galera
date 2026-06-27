@@ -327,8 +327,14 @@ body.light .word .slot, body.light .rack .slot {
 #final { background: radial-gradient(ellipse at center, rgba(40,28,5,0.96), transparent 80%), var(--bg) !important; }
 body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,120,0.30), transparent 80%), var(--bg) !important; }
 
-/* resalte al arrastrar sobre una ficha de la bandeja (reordenar) */
+/* resalte al arrastrar sobre una celda de la bandeja (ficha o hueco) */
 .rack .cube.dropok { box-shadow: 0 0 0 2px var(--amber), inset 0 2px 1px rgba(255,255,255,.2), 0 5px 0 var(--cube-edge), 0 8px 14px rgba(0,0,0,.5) !important; }
+.rack .slot.dropok { box-shadow: inset 0 5px 9px rgba(0,0,0,.5), 0 0 0 2px var(--amber), 0 0 10px rgba(212,99,42,.4) !important; }
+
+/* tarjetas de selección de modo */
+.mode-cards .card { display: flex; flex-direction: column; align-items: center; gap: .2rem; padding: .7rem .5rem; }
+.mode-cards .c-name { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; }
+.mode-cards .c-desc { font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
 </style>
 </head>
 <body>
@@ -374,6 +380,11 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
 <div id="screen-setup" class="screen">
   <div class="seal"><img src="galera-seal.png" alt=""></div>
   <div class="subtitle">una partida</div>
+  <div class="section-label">modo</div>
+  <div class="cards mode-cards" id="mode-cards">
+    <button class="card selected" data-mode="clasico"><div class="c-name">Clásico</div><div class="c-desc">la palabra más larga</div></button>
+    <button class="card" data-mode="multi"><div class="c-name">Multipalabra</div><div class="c-desc">cuantas más, mejor</div></button>
+  </div>
   <div class="section-label">rondas</div>
   <div class="cards" id="round-cards">
     <button class="card selected" data-rounds="10"><div class="c-roman">X</div><div class="c-name">10 rondas</div></button>
@@ -427,6 +438,11 @@ body.light #final { background: radial-gradient(ellipse at center, rgba(220,190,
   <div class="section-label">jugadores</div>
   <div class="lobby-players" id="lobby-players"></div>
   <div id="host-actions" style="display:none">
+    <div class="section-label">modo</div>
+    <div class="cards mode-cards" id="lobby-mode">
+      <button class="card selected" data-mode="clasico"><div class="c-name">Clásico</div><div class="c-desc">la palabra más larga</div></button>
+      <button class="card" data-mode="multi"><div class="c-name">Multipalabra</div><div class="c-desc">cuantas más, mejor</div></button>
+    </div>
     <div class="section-label">rondas</div>
     <div class="cards" id="lobby-rounds">
       <button class="card selected" data-rounds="10"><div class="c-roman">X</div><div class="c-name">10 rondas</div></button>
@@ -687,7 +703,8 @@ function bestWord(rackCount) {
 
 /* ===================== ESTADO DE PARTIDA ===================== */
 let totalRounds = 10, round = 0, score = 0;
-let rack = [], slots = new Array(9).fill(null), rackCount = {};
+let tiles = [], rackPos = new Array(9).fill(null), slots = new Array(9).fill(null), rackCount = {};
+let gameMode = 'clasico', roundWords = [], roundScore = 0;
 let history = [];
 let timer = null, timeLeft = 60, roundClosed = false;
 let roundBest = '';
@@ -718,36 +735,38 @@ modeToggle.addEventListener('click', () => { dragMode = !dragMode; applyMode(); 
 /* ===================== RENDER ===================== */
 function renderRack() {
   const el = $('rack'); el.innerHTML = '';
-  rack.forEach((t, i) => {
-    const hidden = t.used || i === draggingRackIdx;
+  for (let i = 0; i < RACK_SIZE; i++) {
+    const t = rackPos[i];
     const c = document.createElement('div');
-    if (hidden) {
-      c.className = 'slot letter'; c.textContent = '';
-    } else {
-      c.className = 'cube letter'; c.textContent = t.ch.toUpperCase(); c.dataset.i = i;
-    }
+    c.dataset.ri = i;
+    if (t && i !== draggingRackIdx) { c.className = 'cube letter'; c.textContent = t.ch.toUpperCase(); }
+    else { c.className = 'slot letter'; c.textContent = ''; }
     el.appendChild(c);
-  });
+  }
 }
 function renderWord() {
   const el = $('word'); el.innerHTML = '';
   for (let p = 0; p < RACK_SIZE; p++) {
-    const idx = slots[p];
+    const t = slots[p];
     const c = document.createElement('div');
     c.dataset.p = p;
-    if (idx == null || p === draggingWordP) {
-      c.className = 'slot letter'; c.textContent = '';
-    } else {
-      c.className = 'cube letter'; c.textContent = rack[idx].ch.toUpperCase(); c.dataset.w = p;
-    }
+    if (t && p !== draggingWordP) { c.className = 'cube letter'; c.textContent = t.ch.toUpperCase(); }
+    else { c.className = 'slot letter'; c.textContent = ''; }
     el.appendChild(c);
   }
 }
-function currentWord() { return normaliza(slots.filter(i => i != null).map(i => rack[i].ch).join('')); }
-function firstEmpty() { for (let p = 0; p < RACK_SIZE; p++) if (slots[p] == null) return p; return -1; }
-function lastFilled() { for (let p = RACK_SIZE - 1; p >= 0; p--) if (slots[p] != null) return p; return -1; }
+function currentWord() { return normaliza(slots.filter(t => t).map(t => t.ch).join('')); }
+function firstEmptySlot() { for (let p = 0; p < RACK_SIZE; p++) if (!slots[p]) return p; return -1; }
+function firstEmptyRack() { for (let i = 0; i < RACK_SIZE; i++) if (!rackPos[i]) return i; return -1; }
+function lastFilledSlot() { for (let p = RACK_SIZE - 1; p >= 0; p--) if (slots[p]) return p; return -1; }
 function saveBestIndicator() {
-  $('round-best').innerHTML = roundBest ? ('mejor de la ronda: <b>' + roundBest.toUpperCase() + '</b> · ' + roundBest.length) : '';
+  if (gameMode === 'multi') {
+    $('round-best').innerHTML = roundWords.length
+      ? ('palabras (' + roundWords.length + '): ' + roundWords.map(w => w.toUpperCase()).join(' · ') + ' · <b>' + roundScore + '</b>')
+      : 'añade palabras: cada una suma sus letras';
+  } else {
+    $('round-best').innerHTML = roundBest ? ('mejor de la ronda: <b>' + roundBest.toUpperCase() + '</b> · ' + roundBest.length) : '';
+  }
 }
 function checkWord() {
   const w = currentWord();
@@ -755,58 +774,75 @@ function checkWord() {
   wEl.classList.remove('valid');
   if (w.length === 0) { st.textContent = 'forma una palabra'; st.className = 'word-state'; return; }
   if (w.length < 3) { st.textContent = w.length + ' · mínimo 3'; st.className = 'word-state'; return; }
-  if (DICT.has(w)) {
-    st.textContent = '✓ ' + w.length + (w.length === 9 ? ' · ¡redonda!' : ' letras');
-    st.className = 'word-state ok'; wEl.classList.add('valid');
-    if (w.length > roundBest.length) { roundBest = w; saveBestIndicator(); }
+  if (!DICT.has(w)) { st.textContent = 'no existe'; st.className = 'word-state bad'; return; }
+  wEl.classList.add('valid');
+  if (gameMode === 'multi') {
+    if (roundWords.indexOf(w) >= 0) { st.textContent = '✓ ' + w.length + ' · ya la tienes'; st.className = 'word-state'; }
+    else { st.textContent = '✓ ' + w.length + ' · pulsa añadir'; st.className = 'word-state ok'; }
   } else {
-    st.textContent = 'no existe';
-    st.className = 'word-state bad';
+    st.textContent = '✓ ' + w.length + (w.length === 9 ? ' · ¡redonda!' : ' letras');
+    st.className = 'word-state ok';
+    if (w.length > roundBest.length) { roundBest = w; saveBestIndicator(); }
   }
 }
 
 /* ===================== COLOCAR / QUITAR ===================== */
 function placeFromRack(i) {
-  if (roundClosed || !rack[i] || rack[i].used) return;
-  const p = firstEmpty(); if (p < 0) return;
-  slots[p] = i; rack[i].used = true;
+  if (roundClosed) return;
+  const t = rackPos[i]; if (!t) return;
+  const p = firstEmptySlot(); if (p < 0) return;
+  slots[p] = t; rackPos[i] = null;
   renderRack(); renderWord(); checkWord(); sfx('place');
 }
 function removeSlot(p) {
   if (roundClosed) return;
-  const idx = slots[p]; if (idx == null) return;
-  rack[idx].used = false; slots[p] = null;
+  const t = slots[p]; if (!t) return;
+  const i = firstEmptyRack(); if (i < 0) return;
+  rackPos[i] = t; slots[p] = null;
   renderRack(); renderWord(); checkWord(); sfx('back');
 }
 function clearWord() {
-  rack.forEach(t => t.used = false); slots = new Array(9).fill(null);
+  rackPos = tiles.slice(); slots = new Array(9).fill(null);
   renderRack(); renderWord(); checkWord();
 }
 function tryAnother() {
   if (roundClosed) return;
+  if (gameMode === 'multi') { addWord(); return; }
   if (roundBest) toast('mejor guardada: ' + roundBest.toUpperCase() + ' · ' + roundBest.length);
   clearWord();
 }
+function addWord() {
+  if (roundClosed) return;
+  const w = currentWord();
+  if (w.length < 3) { toast('mínimo 3 letras'); return; }
+  if (!DICT.has(w)) { toast('no existe'); return; }
+  if (roundWords.indexOf(w) >= 0) { toast('ya la tienes'); return; }
+  roundWords.push(w); roundScore += w.length;
+  saveBestIndicator(); toast('+' + w.length + ' · ' + w.toUpperCase()); sfx('valid');
+  clearWord();
+}
 function dropRackOnSlot(i, p) {
-  if (rack[i].used) return;
-  if (slots[p] == null) {
-    slots[p] = i; rack[i].used = true;
-  } else {
-    // hueco ocupado → intercambio: la que estaba vuelve a la bolsa
-    const old = slots[p]; rack[old].used = false;
-    slots[p] = i; rack[i].used = true;
-  }
+  const t = rackPos[i]; if (!t) return;
+  if (!slots[p]) { slots[p] = t; rackPos[i] = null; }
+  else { const w = slots[p]; slots[p] = t; rackPos[i] = w; }
   sfx('place'); renderRack(); renderWord(); checkWord();
 }
 function dropSlotOnSlot(p0, p1) {
-  if (p0 === p1) { renderRack(); renderWord(); return; }
-  if (slots[p1] == null) {
-    // mover a hueco vacío, dejando hueco en el origen
-    slots[p1] = slots[p0]; slots[p0] = null;
-  } else {
-    // intercambio entre dos letras
-    const tmp = slots[p0]; slots[p0] = slots[p1]; slots[p1] = tmp;
-  }
+  if (p0 === p1) { renderWord(); return; }
+  if (!slots[p1]) { slots[p1] = slots[p0]; slots[p0] = null; }
+  else { const t = slots[p0]; slots[p0] = slots[p1]; slots[p1] = t; }
+  sfx('place'); renderRack(); renderWord(); checkWord();
+}
+function moveRack(i, j) {
+  if (i === j || !rackPos[i]) { renderRack(); return; }
+  if (!rackPos[j]) { rackPos[j] = rackPos[i]; rackPos[i] = null; }
+  else { const t = rackPos[i]; rackPos[i] = rackPos[j]; rackPos[j] = t; }
+  sfx('place'); renderRack();
+}
+function dropSlotOnRack(p, i) {
+  const t = slots[p]; if (!t) return;
+  if (!rackPos[i]) { rackPos[i] = t; slots[p] = null; }
+  else { const r = rackPos[i]; rackPos[i] = t; slots[p] = r; }
   sfx('place'); renderRack(); renderWord(); checkWord();
 }
 
@@ -825,25 +861,23 @@ function hideGhost() { ghost.style.display = 'none'; }
 function overWord(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#word')); }
 function overRack(e) { const el = document.elementFromPoint(e.clientX, e.clientY); return !!(el && el.closest('#rack')); }
 function wordTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#word [data-p]'); return s ? +s.dataset.p : -1; }
-function rackTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#rack [data-i]'); return s ? +s.dataset.i : -1; }
-function swapRack(i, j) {
-  if (i === j || !rack[i] || !rack[j] || rack[i].used || rack[j].used) { renderRack(); return; }
-  const t = rack[i]; rack[i] = rack[j]; rack[j] = t;
-  sfx('place'); renderRack();
-}
+function rackTargetIndex(e) { const el = document.elementFromPoint(e.clientX, e.clientY); const s = el && el.closest('#rack [data-ri]'); return s ? +s.dataset.ri : -1; }
 function highlightTarget(e) {
   document.querySelectorAll('.dropok').forEach(x => x.classList.remove('dropok'));
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const w = el && el.closest('#word [data-p]'); if (w) { w.classList.add('dropok'); return; }
-  const r = el && el.closest('#rack [data-i]'); if (r) r.classList.add('dropok');
+  const r = el && el.closest('#rack [data-ri]'); if (r) r.classList.add('dropok');
 }
 function clearHighlight() { document.querySelectorAll('.dropok').forEach(x => x.classList.remove('dropok')); }
 
 function onDown(e) {
   if (roundClosed) return;
-  const cube = e.target.closest('[data-i],[data-w]'); if (!cube) return;
-  const from = cube.dataset.i !== undefined ? { type: 'rack', i: +cube.dataset.i } : { type: 'word', p: +cube.dataset.w };
-  if (from.type === 'rack' && rack[from.i] && rack[from.i].used) return;
+  const rcell = e.target.closest('#rack [data-ri]');
+  const wcell = e.target.closest('#word [data-p]');
+  let from = null, cube = null;
+  if (rcell && rackPos[+rcell.dataset.ri]) { from = { type: 'rack', i: +rcell.dataset.ri }; cube = rcell; }
+  else if (wcell && slots[+wcell.dataset.p]) { from = { type: 'word', p: +wcell.dataset.p }; cube = wcell; }
+  if (!from) return;
   drag = { from, x0: e.clientX, y0: e.clientY, moved: false };
   try { boardWrap.setPointerCapture(e.pointerId); } catch (err) {}
   if (dragMode) {
@@ -863,16 +897,15 @@ function onUp(e) {
   hideGhost(); clearHighlight();
   draggingRackIdx = null; draggingWordP = null;
   if (dragMode && d.moved) {
-    const tp = wordTargetIndex(e);
+    const wp = wordTargetIndex(e);
+    const ri = rackTargetIndex(e);
     if (d.from.type === 'rack') {
-      if (tp >= 0) dropRackOnSlot(d.from.i, tp);
-      else {
-        const rt = rackTargetIndex(e);
-        if (rt >= 0 && rt !== d.from.i) swapRack(d.from.i, rt);
-        else renderRack();
-      }
+      if (wp >= 0) dropRackOnSlot(d.from.i, wp);
+      else if (ri >= 0) moveRack(d.from.i, ri);
+      else renderRack();
     } else {
-      if (tp >= 0) dropSlotOnSlot(d.from.p, tp);
+      if (wp >= 0) dropSlotOnSlot(d.from.p, wp);
+      else if (ri >= 0) dropSlotOnRack(d.from.p, ri);
       else removeSlot(d.from.p);
     }
   } else {
@@ -887,14 +920,16 @@ boardWrap.addEventListener('pointerup', onUp);
 boardWrap.addEventListener('pointercancel', () => { drag = null; hideGhost(); });
 
 /* ===================== BOTONES DE JUEGO ===================== */
-$('btn-back1').addEventListener('click', () => { const p = lastFilled(); if (p >= 0) removeSlot(p); });
+$('btn-back1').addEventListener('click', () => { const p = lastFilledSlot(); if (p >= 0) removeSlot(p); });
 $('btn-try').addEventListener('click', tryAnother);
 $('btn-stand').addEventListener('click', () => { if (online) submitOnline(); else finishRound(); });
 
 /* ===================== FLUJO DE RONDA ===================== */
 function setupBoard(letters) {
   roundClosed = false; roundBest = ''; mySubmitted = false;
-  rack = letters.map(ch => ({ ch, used: false }));
+  roundWords = []; roundScore = 0;
+  tiles = letters.map((ch, id) => ({ ch, id }));
+  rackPos = tiles.slice();
   rackCount = countLetters(letters);
   slots = new Array(9).fill(null);
   draggingRackIdx = null; draggingWordP = null;
@@ -907,11 +942,15 @@ function startTimer() {
   timer = setInterval(() => { timeLeft--; updateClock(); if (timeLeft <= 0) onTimeUp(); }, 1000);
 }
 function onTimeUp() { if (online) submitOnline(); else finishRound(); }
+function applyModeUI() {
+  $('btn-try').textContent = (gameMode === 'multi') ? 'añadir' : 'intentar otra';
+}
 function startRound() {
+  applyModeUI();
   setupBoard(dealLetters());
   $('online-banner').textContent = '';
   $('st-round').textContent = round + '/' + totalRounds;
-  $('st-score-l').textContent = 'letras';
+  $('st-score-l').textContent = (gameMode === 'multi') ? 'puntos' : 'letras';
   $('st-score').textContent = score;
   startTimer();
 }
@@ -923,6 +962,14 @@ function finishRound() {
   if (roundClosed) return;
   roundClosed = true;
   clearInterval(timer);
+  if (gameMode === 'multi') {
+    const wm = currentWord();
+    if (wm.length >= 3 && DICT.has(wm) && roundWords.indexOf(wm) < 0) { roundWords.push(wm); roundScore += wm.length; }
+    score += roundScore;
+    history.push({ round, words: roundWords.slice(), len: roundScore });
+    revealRoundMulti(roundWords.slice(), roundScore);
+    return;
+  }
   // incorpora la palabra que esté en la tira si es válida y supera la mejor
   const w = currentWord();
   if (w.length >= 3 && DICT.has(w) && w.length > roundBest.length) roundBest = w;
@@ -933,6 +980,25 @@ function finishRound() {
   score += len;
   history.push({ round, word: roundBest, len, best });
   revealRound(valid ? roundBest : '', len, diana, best);
+}
+function revealRoundMulti(words, total) {
+  const rv = $('reveal');
+  rv.classList.remove('multi', 'diana'); $('r-rank').innerHTML = '';
+  $('r-round').textContent = 'ronda ' + round;
+  $('r-word').textContent = total > 0 ? ('+' + total) : '—';
+  $('r-dist').textContent = words.length ? (words.length + (words.length === 1 ? ' palabra' : ' palabras')) : 'sin palabras esta ronda';
+  $('r-best').textContent = words.length ? words.map(w => w.toUpperCase()).join(' · ') : '';
+  rv.classList.add('visible');
+  setTimeout(() => sfx(total > 0 ? 'chime' : 'back'), 350);
+  setTimeout(() => speak(words.length ? (total + ' puntos con ' + words.length + (words.length === 1 ? ' palabra.' : ' palabras.')) : 'Sin palabras.'), 800);
+  revealWaiting = true;
+  const cont = () => {
+    if (!revealWaiting) return; revealWaiting = false;
+    rv.classList.remove('visible'); rv.removeEventListener('click', cont);
+    if (round >= totalRounds) showFinal(); else { round++; startRound(); }
+  };
+  rv.addEventListener('click', cont);
+  setTimeout(cont, REVEAL_MS);
 }
 
 /* ===================== REVEAL ===================== */
@@ -973,28 +1039,34 @@ function saveRecords(r) { try { localStorage.setItem('galera_records', JSON.stri
 function showFinal() {
   $('final').classList.remove('multi'); $('f-stats').style.display = ''; $('f-standings').innerHTML = '';
   $('btn-again').textContent = 'Otra vez'; $('btn-home').textContent = '← menú';
+  const multi = gameMode === 'multi';
   const recs = loadRecords();
-  const key = 'best' + totalRounds;
+  const key = 'best' + (multi ? 'M' : '') + totalRounds;
   const prev = recs[key] || 0;
   const isRecord = score > prev;
   if (isRecord) recs[key] = score;
-  // palabra más larga de la partida
+  // palabra más larga de la partida (vale en ambos modos)
   let longestThis = '';
-  for (const h of history) if (h.word && h.word.length > longestThis.length) longestThis = h.word;
+  for (const h of history) {
+    if (h.word && h.word.length > longestThis.length) longestThis = h.word;
+    if (h.words) for (const w of h.words) if (w.length > longestThis.length) longestThis = w;
+  }
   const prevLong = recs.longest || '';
   let newLongest = false;
   if (longestThis && longestThis.length > prevLong.length) { recs.longest = longestThis; newLongest = true; }
   saveRecords(recs);
 
+  const unit = multi ? 'puntos' : 'letras';
   $('f-total').textContent = score;
   $('f-best').textContent = longestThis ? longestThis.toUpperCase() : '—';
   $('f-rounds').textContent = totalRounds;
-  $('f-sub').innerHTML = '<b>' + score + '</b> letras en <b>' + totalRounds + '</b> rondas';
+  $('f-sub').innerHTML = '<b>' + score + '</b> ' + unit + ' en <b>' + totalRounds + '</b> rondas';
+  $('f-stats').querySelector('.f-stat .l').textContent = unit;
   let rec = '';
-  if (isRecord) rec += '¡nuevo récord de puntuación!';
+  if (isRecord) rec += '¡nuevo récord' + (multi ? ' Multipalabra' : '') + '!';
   if (newLongest) rec += (rec ? ' · ' : '') + 'mejor palabra de tu historia';
   if (!rec) {
-    rec = 'récord (' + totalRounds + '): <b>' + (recs[key] || 0) + '</b>';
+    rec = 'récord (' + (multi ? 'multi ' : '') + totalRounds + '): <b>' + (recs[key] || 0) + '</b>';
     if (recs.longest) rec += ' · palabra más larga: <b>' + recs.longest.toUpperCase() + '</b>';
   }
   $('f-record').innerHTML = rec;
@@ -1002,7 +1074,7 @@ function showFinal() {
   $('final').classList.add('visible');
   playMenuMusic();
   setTimeout(() => sfx('diana'), 300);
-  setTimeout(() => speak(score + ' letras en ' + totalRounds + ' rondas.' + (isRecord ? ' ¡Nuevo récord!' : '')), 900);
+  setTimeout(() => speak(score + ' ' + unit + ' en ' + totalRounds + ' rondas.' + (isRecord ? ' ¡Nuevo récord!' : '')), 900);
 }
 
 /* ===================== INICIO DE PARTIDA ===================== */
@@ -1061,7 +1133,7 @@ async function createRoom() {
   for (let i = 0; i < 6; i++) { code = genCode(); const ex = await fbGet(BASE + '/' + code); if (!ex) break; }
   roomCode = code;
   await fbSet(BASE + '/' + code, {
-    code, createdAt: SV, state: 'lobby', mode: { rounds: 10 }, currentRound: 0,
+    code, createdAt: SV, state: 'lobby', mode: { rounds: 10, game: 'clasico' }, currentRound: 0,
     players: { [myId]: { name: myName, colorIdx: 0, score: 0, joinedAt: SV, lastSeen: Date.now() } }
   });
   enterLobby();
@@ -1114,6 +1186,8 @@ function handleRoom() {
 function syncRoundCardSelection() {
   const r = (roomData.mode && roomData.mode.rounds) || 10;
   $('lobby-rounds').querySelectorAll('.card').forEach(c => c.classList.toggle('selected', parseInt(c.dataset.rounds, 10) === r));
+  const g = (roomData.mode && roomData.mode.game) || 'clasico';
+  $('lobby-mode').querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.mode === g));
 }
 function renderLobbyPlayers() {
   const wrap = $('lobby-players'); wrap.innerHTML = '';
@@ -1127,7 +1201,7 @@ function renderLobbyPlayers() {
     wrap.appendChild(el);
   });
 }
-function rankPointsLen(subs) {
+function rankPointsLen(subs, allowNine) {
   const N = subs.length;
   const wd = subs.map(s => ({ ...s, len: s.len || 0 }));
   wd.sort((a, b) => b.len - a.len);
@@ -1135,7 +1209,7 @@ function rankPointsLen(subs) {
   return wd.map((s, i) => {
     if (i > 0 && s.len < wd[i - 1].len) rank = i + 1;
     let pts = s.len > 0 ? (N - rank + 1) : 0;
-    if (s.len === 9) pts += NINE_BONUS;
+    if (allowNine && s.len === 9) pts += NINE_BONUS;
     return { ...s, pos: s.len > 0 ? rank : N, pts };
   });
 }
@@ -1160,7 +1234,8 @@ function hostResolveRound(n, subs) {
   const players = roomData.players || {};
   const ids = Object.keys(players);
   const entries = ids.map(id => { const s = subs[id]; return { id, word: s ? (s.word || '') : '', len: s ? (s.len || 0) : 0 }; });
-  const ranked = rankPointsLen(entries);
+  const allowNine = !(roomData.mode && roomData.mode.game === 'multi');
+  const ranked = rankPointsLen(entries, allowNine);
   const scoreUpd = {};
   ranked.forEach(r => { scoreUpd['players/' + r.id + '/score'] = (players[r.id].score || 0) + r.pts; });
   const ranking = ranked.map(r => ({ id: r.id, name: players[r.id].name, colorIdx: players[r.id].colorIdx, word: r.word, len: r.len, pos: r.pos, pts: r.pts }));
@@ -1177,6 +1252,8 @@ function hostAdvance(prevN) {
 /* ---- jugador en ronda online ---- */
 function enterOnlineRound(rnd) {
   round = rnd.n;
+  gameMode = (roomData.mode && roomData.mode.game) || 'clasico';
+  applyModeUI();
   if (!$('screen-game').classList.contains('visible')) { document.body.classList.add('in-game'); show('screen-game'); }
   $('reveal').classList.remove('visible');
   $('st-score-l').textContent = 'puntos';
@@ -1206,6 +1283,15 @@ function renderLiveScores() {
 }
 function submitOnline() {
   if (mySubmitted) return;
+  if (gameMode === 'multi') {
+    const w = currentWord();
+    if (w.length >= 3 && DICT.has(w) && roundWords.indexOf(w) < 0) { roundWords.push(w); roundScore += w.length; }
+    mySubmitted = true; roundClosed = true; clearInterval(timer);
+    $('wv-fig').textContent = roundWords.length ? (roundWords.length + ' · ' + roundScore + ' pts') : 'sin palabras';
+    $('wait-veil').classList.add('on');
+    fbSet(BASE + '/' + roomCode + '/subs/r' + round + '/' + myId, { word: roundWords.length + (roundWords.length === 1 ? ' palabra' : ' palabras'), len: roundScore, words: roundWords });
+    return;
+  }
   const w = currentWord();
   if (w.length >= 3 && DICT.has(w) && w.length > roundBest.length) roundBest = w;
   mySubmitted = true; roundClosed = true; clearInterval(timer);
@@ -1217,6 +1303,7 @@ function submitOnline() {
 function revealOnline(result) {
   roundClosed = true; mySubmitted = false;
   $('wait-veil').classList.remove('on');
+  const multiR = roomData.mode && roomData.mode.game === 'multi';
   const rv = $('reveal'); rv.classList.add('multi'); rv.classList.remove('diana');
   $('r-round').textContent = 'ronda ' + result.round;
   $('r-word').textContent = ''; $('r-dist').textContent = ''; $('r-best').textContent = '';
@@ -1225,8 +1312,8 @@ function revealOnline(result) {
     const row = document.createElement('div');
     row.className = 'rk-row' + (r.id === myId ? ' me' : '') + (r.pos === 1 && r.len > 0 ? ' win' : '');
     row.style.setProperty('--p-color', COLORS[r.colorIdx % COLORS.length]);
-    const wTxt = r.len > 0 ? r.word.toUpperCase() : '—';
-    const star = r.len === 9 ? ' ★' : '';
+    const wTxt = r.len > 0 ? (multiR ? (r.word + ' · ' + r.len) : r.word.toUpperCase()) : '—';
+    const star = (!multiR && r.len === 9) ? ' ★' : '';
     row.innerHTML = '<span class="rk-pos">' + (r.len > 0 ? r.pos : '–') + '</span><span class="rk-dot"></span>' +
       '<span class="rk-nm">' + escapeHtml(r.name) + star + '</span>' +
       '<span class="rk-fig mono">' + wTxt + '</span><span class="rk-pts mono">+' + r.pts + '</span>';
@@ -1234,12 +1321,12 @@ function revealOnline(result) {
   });
   rv.classList.add('visible');
   const winners = result.ranking.filter(r => r.pos === 1 && r.len > 0);
-  setTimeout(() => sfx(winners.some(w => w.len === 9) ? 'diana' : 'chime'), 300);
+  setTimeout(() => sfx((!multiR && winners.some(w => w.len === 9)) ? 'diana' : 'chime'), 300);
   setTimeout(() => {
     let phrase;
-    if (!winners.length) phrase = 'Nadie ha formado palabra.';
+    if (!winners.length) phrase = multiR ? 'Nadie ha puntuado.' : 'Nadie ha formado palabra.';
     else if (winners.length > 1) phrase = 'Empate en cabeza.';
-    else { const w = winners[0]; phrase = (w.len === 9 ? '¡Redonda de ' + w.name + '! ' : w.name + ' gana con ' + w.word + '.'); }
+    else { const w = winners[0]; phrase = (!multiR && w.len === 9) ? ('¡Redonda de ' + w.name + '! ') : (w.name + ' gana la ronda.'); }
     speak(phrase);
   }, 900);
   setTimeout(() => { rv.classList.remove('visible'); }, REVEAL_MS);
@@ -1314,6 +1401,13 @@ document.querySelectorAll('#round-cards .card').forEach(card => {
     totalRounds = +card.dataset.rounds;
   });
 });
+document.querySelectorAll('#mode-cards .card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('#mode-cards .card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    gameMode = card.dataset.mode;
+  });
+});
 $('btn-play').addEventListener('click', beginGame);
 $('btn-again').addEventListener('click', () => { if (online) requestRematch(); else { $('final').classList.remove('visible'); beginGame(); } });
 $('btn-home').addEventListener('click', () => { if (online) leaveRoom(); else { $('final').classList.remove('visible'); show('screen-home'); } });
@@ -1341,7 +1435,12 @@ $('btn-join-continue').addEventListener('click', () => {
 $('lobby-rounds').addEventListener('click', e => {
   if (!amHost) return; const c = e.target.closest('.card'); if (!c) return;
   $('lobby-rounds').querySelectorAll('.card').forEach(x => x.classList.remove('selected')); c.classList.add('selected');
-  fbSet(BASE + '/' + roomCode + '/mode', { rounds: parseInt(c.dataset.rounds, 10) });
+  fbSet(BASE + '/' + roomCode + '/mode/rounds', parseInt(c.dataset.rounds, 10));
+});
+$('lobby-mode').addEventListener('click', e => {
+  if (!amHost) return; const c = e.target.closest('.card'); if (!c) return;
+  $('lobby-mode').querySelectorAll('.card').forEach(x => x.classList.remove('selected')); c.classList.add('selected');
+  fbSet(BASE + '/' + roomCode + '/mode/game', c.dataset.mode);
 });
 $('btn-start-game').addEventListener('click', hostStartGame);
 $('btn-lobby-leave').addEventListener('click', leaveRoom);
@@ -1369,7 +1468,7 @@ setTimeout(() => { if (!deferredPrompt && !isStandalone()) installBtn.classList.
 
 /* ===================== ARRANQUE ===================== */
 (async function boot() {
-  $('app-version').textContent = 'v0.10';
+  $('app-version').textContent = 'v0.11';
   try {
     await loadDict();
   } catch (e) {
